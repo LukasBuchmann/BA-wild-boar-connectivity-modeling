@@ -205,3 +205,38 @@ cython_debug/
 marimo/_static/
 marimo/_lsp/
 __marimo__/
+
+# Ignore the entire data folder and all its contents
+data/
+
+# Ignore spatial raster formats
+*.tif
+*.tiff
+*.img
+*.asc
+*.dem
+
+# Ignore spatial vector formats
+*.shp
+*.shx
+*.dbf
+*.prj
+*.sbn
+*.sbx
+*.cpg
+*.gpkg
+*.geojson
+
+# Ignore tabular data
+*.csv
+*.xlsx
+
+# Ignore QGIS project files
+*.qgs
+*.qgz
+*.qgs~
+
+# Ignore large compressed files
+*.zip
+*.tar.gz
+*.rar

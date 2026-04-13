@@ -1,0 +1,9 @@
+# Literaturübersicht oder Theorie
+
+Die theoretische Grundlage für Gehirn-Körper-Allometrie basiert auf dem Konzept, dass biologische Strukturen häufig Potenzgesetzen folgen. Die erwartete Beziehung wird typischerweise als:
+
+$$\text{Gehirngewicht} = a \times \text{Körpergewicht}^b$$
+
+beschrieben, wobei der Exponent b in der Regel zwischen 0.6 und 0.8 liegt. @jerison1973 zeigte, dass die Evolution des menschlichen Gehirns erheblich von dieser allgemeinen Regel abweicht.
+
+Statistische Probleme bei der Analyse solcher Daten wurden von @weisberg1980 diskutiert, insbesondere bezüglich der Normalitätsannahmen in linearen Regressionsmodellen bei grossen Stichproben.

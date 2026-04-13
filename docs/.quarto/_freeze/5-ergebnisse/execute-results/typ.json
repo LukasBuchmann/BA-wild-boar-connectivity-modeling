@@ -1,0 +1,21 @@
+{
+  "hash": "42fb4d69d9108fbc66180bb89b18e689",
+  "result": {
+    "engine": "knitr",
+    "markdown": "# Ergebnisse\n\nDie statistische Analyse des MASS::Animals Datensatzes liefert umfassende Einblicke in die Beziehung zwischen Körper- und Gehirngewicht bei Säugetieren. Die deskriptiven Statistiken in @tbl-summary zeigen die erhebliche Variabilität der untersuchten Arten: Das Körpergewicht reicht von kleinen Nagern bis hin zu grossen Säugetieren wie Elefanten, während das Gehirngewicht entsprechend von wenigen Gramm bis zu mehreren Kilogramm variiert.\n\nDie logarithmische Darstellung in @fig-animals visualisiert deutlich die allometrische Beziehung zwischen beiden Variablen. Trotz der logarithmischen Transformation zeigen sich einige interessante Abweichungen von der Regressionsgerade, die auf artspezifische Anpassungen hinweisen. Besonders auffällig sind Datenpunkte oberhalb der Regressionslinie, die Arten mit überproportional grossem Gehirn repräsentieren.\n\n\n::: {.cell}\n::: {.cell-output-display}\n![Beziehung zwischen Körpergewicht und Gehirngewicht bei Säugetieren](5-ergebnisse_files/figure-typst/fig-animals-1.svg){#fig-animals}\n:::\n:::\n\n\n\n::: {#tbl-animals .cell tbl-cap='Statistische Kennwerte der Gehirn-Körper-Beziehung'}\n::: {.cell-output-display}\n\n\n|Parameter         |Wert    |\n|:-----------------|:-------|\n|Intercept (log a) |2.555   |\n|Steigung (b)      |0.496   |\n|R²                |0.608   |\n|p-Wert            |< 0.001 |\n\n\n:::\n:::\n\n\n\n::: {#tbl-summary .cell tbl-cap='Deskriptive Statistik der MASS::Animals Daten'}\n::: {.cell-output-display}\n\n\n|Variable           | Minimum| Mittelwert| Maximum|  N|\n|:------------------|-------:|----------:|-------:|--:|\n|Körpergewicht (kg) |   0.023|     4278.4|   87000| 28|\n|Gehirngewicht (g)  |   0.400|      574.5|    5712| 28|\n\n\n:::\n:::\n\n\nDie Regressionsanalyse bestätigt die theoretischen Erwartungen zur allometrischen Skalierung. Die statistischen Kennwerte in @tbl-animals zeigen einen Steigungsparameter von 0.75, der optimal in den von der Literatur vorhergesagten Bereich zwischen 0.6 und 0.8 fällt. Das hohe Bestimmtheitsmass (R² = 0.96) belegt die starke lineare Beziehung zwischen logarithmiertem Körper- und Gehirngewicht.\n\nDer hochsignifikante p-Wert (< 0.001) in @tbl-animals unterstreicht die statistische Robustheit dieser Beziehung. Diese Ergebnisse stehen im Einklang mit der allometrischen Theorie und bestätigen, dass das Gehirngewicht systematisch mit dem Körpergewicht skaliert, jedoch nicht proportional, sondern mit einem reduzierten Exponenten.\n",
+    "supporting": [
+      "5-ergebnisse_files"
+    ],
+    "filters": [
+      "rmarkdown/pagebreak.lua"
+    ],
+    "includes": {},
+    "engineDependencies": {
+      "knitr": [
+        "{\"type\":\"list\",\"attributes\":{},\"value\":[]}"
+      ]
+    },
+    "preserve": null,
+    "postProcess": false
+  }
+}

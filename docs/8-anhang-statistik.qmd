@@ -1,0 +1,68 @@
+# Statistische Outputs
+
+## Vollständige Regressionsanalyse
+
+```{r}
+#| label: tbl-full-regression
+#| tbl-cap: "Detaillierte Regressionsstatistiken"
+
+library(MASS)
+data(Animals)
+model <- lm(log(brain) ~ log(body), data = Animals)
+summary_full <- summary(model)
+
+library(knitr)
+regression_stats <- data.frame(
+  Statistik = c("Multiple R-squared", "Adjusted R-squared", "F-statistic",
+                "F p-value", "Residual standard error", "Degrees of freedom"),
+  Wert = c(
+    round(summary_full$r.squared, 4),
+    round(summary_full$adj.r.squared, 4),
+    round(summary_full$fstatistic[1], 2),
+    ifelse(pf(summary_full$fstatistic[1], summary_full$fstatistic[2],
+             summary_full$fstatistic[3], lower.tail = FALSE) < 0.001,
+           "< 0.001",
+           round(pf(summary_full$fstatistic[1], summary_full$fstatistic[2],
+                    summary_full$fstatistic[3], lower.tail = FALSE), 4)),
+    round(summary_full$sigma, 4),
+    paste(summary_full$df[2], "on", summary_full$df[1], "DF")
+  )
+)
+
+kable(regression_stats)
+```
+
+## Koeffizienten mit Konfidenzintervallen
+
+```{r}
+#| label: tbl-coefficients
+#| tbl-cap: "Regressionskoeffizienten mit 95% Konfidenzintervallen"
+
+coef_table <- data.frame(
+  Parameter = c("Intercept (log a)", "Steigung (b)"),
+  Schätzung = round(coef(model), 4),
+  Standardfehler = round(summary_full$coefficients[,2], 4),
+  t_Wert = round(summary_full$coefficients[,3], 3),
+  p_Wert = ifelse(summary_full$coefficients[,4] < 0.001, "< 0.001",
+                  round(summary_full$coefficients[,4], 4)),
+  CI_2.5 = round(confint(model)[,1], 4),
+  CI_97.5 = round(confint(model)[,2], 4)
+)
+
+kable(coef_table)
+```
+
+## Modelldiagnostik
+
+```{r}
+#| label: fig-diagnostics
+#| fig-cap: "Diagnostische Plots für die Regressionsanalyse"
+#| fig-height: 8
+
+par(mfrow = c(2, 2))
+plot(model, which = 1:4, caption = c("Residuen vs. Angepasste Werte",
+                                     "Q-Q Plot der Residuen",
+                                     "Scale-Location Plot",
+                                     "Residuen vs. Leverage"))
+par(mfrow = c(1, 1))
+```

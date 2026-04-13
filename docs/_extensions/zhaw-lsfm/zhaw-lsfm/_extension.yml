@@ -1,0 +1,40 @@
+title: zhaw-lsfm
+author: Nils Ratnaweera
+version: 0.2.1
+quarto-required: ">=1.9.18"
+contributes:
+  formats:
+    typst:
+      fontsize: 11pt
+      citeproc: true
+      section-numbering: "1.1."
+      number-depth: 2
+      toc-depth: 2
+      toc: false
+      filters:
+        - pagebreak-filter.lua
+        - appendix-filter.lua
+      template-partials:
+        - typst-template.typ
+        - typst-show.typ
+      execute:
+        echo: false
+        warning: false
+        error: true
+    html:
+      filters:
+        - html-labels.lua
+      template-partials:
+        - partials/title-block.html
+      css:
+        - zhaw-html.css
+      echo: false
+      toc: true
+      number-sections: true
+      execute:
+        warning: false
+        error: true
+
+  shortcodes:
+    - shortcodes.lua
+

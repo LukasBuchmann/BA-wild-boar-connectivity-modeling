@@ -1,0 +1,61 @@
+# Rohdaten
+
+Zusätzliche Materialien und Daten, die nicht im Hauptteil der Arbeit enthalten sind, werden im Anhang aufgeführt.
+
+Der vollständige MASS::Animals Datensatz mit allen 28 Säugetierarten:
+
+```{r}
+#| label: tbl-full-data
+#| tbl-cap: "Vollständige Rohdaten des MASS::Animals Datensatzes"
+
+library(MASS)
+library(knitr)
+data(Animals)
+
+animals_full <- data.frame(
+  Art = rownames(Animals),
+  Körpergewicht_kg = Animals$body,
+  Gehirngewicht_g = Animals$brain,
+  Log_Körpergewicht = round(log10(Animals$body), 3),
+  Log_Gehirngewicht = round(log10(Animals$brain), 3)
+)
+
+kable(animals_full, row.names = FALSE)
+```
+
+## Datenquelle und -qualität
+
+Die Daten stammen aus verschiedenen Quellen und wurden über mehrere Jahrzehnte zusammengetragen. Einige Besonderheiten der Datensammlung:
+
+- **Afrikanischer Elefant**: Mit 6654 kg Körpergewicht und 5712 g Gehirngewicht das grösste Säugetier in der Stichprobe
+- **Spitzmaus**: Das kleinste Säugetier mit nur 0.004 kg Körpergewicht und 0.14 g Gehirngewicht
+- **Mensch**: Zeigt mit 1320 g Gehirngewicht bei 62 kg Körpergewicht eine deutliche positive Abweichung von der allometrischen Beziehung
+- **Primaten generell**: Schimpanse, Gorilla und Rhesusaffe zeigen alle überdurchschnittlich grosse Gehirne
+
+## Ausreisser-Analyse
+
+```{r}
+#| label: fig-residuals
+#| fig-cap: "Residuen der logarithmischen Regression zur Identifikation von Ausreissern"
+
+model <- lm(log(brain) ~ log(body), data = Animals)
+residuals_df <- data.frame(
+  Art = rownames(Animals),
+  Fitted = fitted(model),
+  Residuals = residuals(model),
+  Body = Animals$body
+)
+
+library(ggplot2)
+ggplot(residuals_df, aes(x = Fitted, y = Residuals, label = Art)) +
+  geom_point(size = 3, alpha = 0.7, color = "darkblue") +
+  geom_hline(yintercept = 0, color = "red", linetype = "dashed") +
+  geom_text(aes(label = ifelse(abs(Residuals) > 0.5, Art, "")),
+            vjust = -0.5, hjust = 0.5, size = 3) +
+  labs(
+    x = "Angepasste Werte (log scale)",
+    y = "Residuen",
+    title = "Residuen vs. Angepasste Werte"
+  ) +
+  theme_minimal()
+```

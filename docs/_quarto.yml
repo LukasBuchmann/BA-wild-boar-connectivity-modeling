@@ -1,0 +1,54 @@
+project:
+  type: book
+  output-dir: docs
+
+book:
+  title: "Robuste Regression und Outlier Erkennung"
+  subtitle: "Einfache Regression"
+  author:
+    - Peter Rousseeuw
+  date: "2024-12-15"
+  downloads: pdf           # adds a PDF download button to the HTML navbar
+  chapters:
+    - file: index.qmd
+      text: "Titelseite"   # sidebar label for the title page
+    - 1-zusammenfassung.qmd
+    - 2-einleitung.qmd
+    - 3-literatur.qmd
+    - 4-methoden.qmd
+    - 5-ergebnisse.qmd
+    - 6-diskussion.qmd
+    - references.qmd
+  appendices:
+    - 7-anhang-rohdaten.qmd
+    - 8-anhang-statistik.qmd
+
+bibliography: references.bib
+lang: de                   # controls automatic text (e.g. "Abgabedatum" vs "Submission date")
+
+institut: "Institut für Umwelt und Natürliche Ressourcen"
+keywords: "Robuste Regression, Ausreisser, Allometrie, Säugetiere, Gehirngrösse, Statistik"
+confidential: true         # adds a "Vertraulich" notice on the title page
+zhaw-cover-image:
+  src: cover.png
+  max-width: 100%          # optional, constrains the image on the title page
+  max-height: 5cm
+thesis-type: "Projektarbeit 2"
+degree-type: "Bachelorstudiengang"
+study-year: "2009"
+submission-date: "2024-12-15"
+study-direction: "Umweltingenieurwesen"
+supervisors:
+  - title: "Prof. Dr."
+    name: "Max Mustermann"
+    affiliation: "ZHAW Life Sciences und Facility Management, Wädenswil"
+  - title: "Dr."
+    name: "Anna Beispiel"
+    affiliation: "ETH Zürich, Institut für Umweltingenieurwissenschaften, Zürich"
+  - title: "Prof. Dr."
+    name: "Susanne Müller"
+    affiliation: "Universität Zürich, Institut für Evolutionsbiologie und Umweltwissenschaften, Zürich"
+
+format:
+  zhaw-lsfm-typst: default
+  zhaw-lsfm-html: default

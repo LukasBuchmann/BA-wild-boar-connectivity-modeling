@@ -1,0 +1,41 @@
+# Material und Methoden
+
+## Datensatz
+
+Die Analyse basiert auf dem `Animals` Datensatz aus dem R-Paket MASS, der Gehirn- und Körpergewichtsdaten für 28 verschiedene Säugetierarten enthält.
+
+### Datenquelle und Charakteristika
+
+Der Datensatz wurde ursprünglich von @weisberg1980 zusammengestellt und enthält Messungen von verschiedenen Wirbeltierarten. Die Daten umfassen sowohl terrestrische als auch aquatische Säugetiere mit einem breiten Spektrum von Körpergewichten.
+
+### Datenqualität und Limitationen
+
+Einige Messungen stammen aus älteren Studien und könnten methodische Ungenauigkeiten aufweisen. Besonders bei sehr grossen Tieren wie Elefanten können die Gehirngewichte schwer präzise zu bestimmen sein.
+
+## Statistische Analyse
+
+Die Daten wurden logarithmisch transformiert, um eine lineare Beziehung zu erhalten:
+
+```{.r}
+log(Gehirngewicht) = log(a) + b * log(Körpergewicht)
+```
+
+### Transformationsverfahren
+
+Die logarithmische Transformation ist bei allometrischen Beziehungen Standard, da sie Potenzgesetze in lineare Beziehungen überführt. Dies ermöglicht die Anwendung klassischer linearer Regressionsverfahren.
+
+### Modellvalidierung
+
+Die Residuen wurden auf Normalität und Homoskedastizität überprüft. Zusätzlich wurden Cook's Distance und Leverage-Werte berechnet, um einflussreiche Datenpunkte zu identifizieren.
+
+## Visualisierung
+
+Scatterplots wurden erstellt, um die Beziehung zu visualisieren, sowohl auf ursprünglicher als auch auf logarithmischer Skala.
+
+### Graphische Darstellung
+
+Die Visualisierungen umfassen sowohl die Rohdaten als auch die transformierten Daten mit Regressionsgerade und Konfidenzintervall.
+
+### Software und Pakete
+
+Alle Analysen und Visualisierungen wurden in R durchgeführt unter Verwendung der Pakete ggplot2, MASS und dplyr.

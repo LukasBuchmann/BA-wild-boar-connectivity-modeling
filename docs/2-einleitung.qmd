@@ -1,0 +1,5 @@
+# Einleitung
+
+Die Beziehung zwischen Gehirngrösse und Körpergewicht ist ein fundamentaler Aspekt der vergleichenden Neurobiologie und Evolution. Seit den bahnbrechenden Arbeiten zur fossilen Evidenz der menschlichen Gehirnentwicklung [@jerison1973] ist bekannt, dass die Gehirngrösse nicht linear mit dem Körpergewicht skaliert.
+
+Diese Studie analysiert die Allometrie von Gehirn- und Körpergewicht anhand eines umfangreichen Datensatzes verschiedener Säugetierarten. Das Ziel ist es, die mathematische Beziehung zwischen diesen Variablen zu quantifizieren und Ausreisser zu identifizieren, die auf besondere evolutionäre Anpassungen hinweisen könnten.

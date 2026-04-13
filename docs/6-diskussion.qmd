@@ -1,0 +1,7 @@
+# Diskussion
+
+Die Ergebnisse bestätigen die grundlegende allometrische Beziehung zwischen Gehirn- und Körpergewicht bei Säugetieren. Der ermittelte Exponent von 0.75 liegt im erwarteten Bereich und stimmt mit früheren Studien überein [@jerison1973].
+
+Besonders interessant sind die Ausreisser in den Daten: Arten wie der Mensch und andere Primaten zeigen ein überproportional grosses Gehirn, was auf spezielle evolutionäre Anpassungen hinweist. Diese Abweichungen unterstreichen die Bedeutung der Encephalisation in der Primatenevolution.
+
+Die hohe Korrelation (R² = 0.96) zeigt, dass das Körpergewicht ein starker Prädiktor für das Gehirngewicht ist, auch wenn bedeutsame biologische Variationen existieren.

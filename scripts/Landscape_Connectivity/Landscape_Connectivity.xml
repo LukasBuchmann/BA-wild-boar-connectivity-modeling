@@ -1,0 +1,184 @@
+<Project>
+  <name>Landscape_Connectivity</name>
+  <version>3.0.6</version>
+  <codes>
+    <int>-2147483648</int>
+    <int>1</int>
+    <int>2</int>
+    <int>3</int>
+    <int>4</int>
+    <int>5</int>
+    <int>6</int>
+    <int>7</int>
+    <int>8</int>
+    <int>9</int>
+    <int>10</int>
+    <int>11</int>
+    <int>12</int>
+    <int>13</int>
+    <int>14</int>
+    <int>15</int>
+    <int>16</int>
+    <int>17</int>
+    <int>18</int>
+    <int>19</int>
+    <int>20</int>
+    <int>21</int>
+    <int>22</int>
+    <int>23</int>
+    <int>24</int>
+    <int>25</int>
+    <int>26</int>
+    <int>27</int>
+    <int>28</int>
+    <int>29</int>
+    <int>30</int>
+    <int>31</int>
+    <int>32</int>
+    <int>33</int>
+    <int>34</int>
+    <int>35</int>
+    <int>36</int>
+    <int>37</int>
+    <int>38</int>
+    <int>39</int>
+    <int>40</int>
+    <int>41</int>
+    <int>42</int>
+    <int>43</int>
+    <int>44</int>
+    <int>45</int>
+    <int>46</int>
+    <int>47</int>
+    <int>48</int>
+    <int>49</int>
+    <int>50</int>
+    <int>51</int>
+    <int>52</int>
+    <int>53</int>
+    <int>54</int>
+    <int>55</int>
+    <int>56</int>
+    <int>57</int>
+    <int>58</int>
+    <int>59</int>
+    <int>60</int>
+    <int>61</int>
+    <int>62</int>
+    <int>63</int>
+    <int>64</int>
+    <int>65</int>
+    <int>66</int>
+    <int>67</int>
+    <int>68</int>
+    <int>69</int>
+    <int>70</int>
+    <int>71</int>
+    <int>72</int>
+    <int>73</int>
+    <int>74</int>
+    <int>75</int>
+    <int>76</int>
+    <int>77</int>
+    <int>78</int>
+    <int>79</int>
+    <int>80</int>
+    <int>81</int>
+    <int>82</int>
+    <int>83</int>
+    <int>84</int>
+    <int>85</int>
+    <int>86</int>
+    <int>87</int>
+    <int>88</int>
+    <int>89</int>
+    <int>90</int>
+    <int>91</int>
+    <int>92</int>
+    <int>93</int>
+    <int>94</int>
+    <int>95</int>
+    <int>96</int>
+    <int>97</int>
+    <int>98</int>
+    <int>99</int>
+    <int>100</int>
+  </codes>
+  <noData>NaN</noData>
+  <resolution>25.001647216035572</resolution>
+  <grid2space>
+    <m00>25.001647216035572</m00>
+    <m01>0.0</m01>
+    <m02>2620673.050352784</m02>
+    <m10>0.0</m10>
+    <m11>-24.999605876865683</m11>
+    <m12>1274797.4386058769</m12>
+  </grid2space>
+  <space2grid>
+    <m00>0.039997364627984165</m00>
+    <m01>0.0</m01>
+    <m02>-104820.01556569179</m02>
+    <m10>0.0</m10>
+    <m11>-0.040000630606956376</m11>
+    <m12>50992.70144036783</m12>
+  </space2grid>
+  <habitats>
+    <entry>
+      <string>core habitats</string>
+      <org.thema.graphab.habitat.MonoVectorHabitat>
+        <idHab>0</idHab>
+        <name>core habitats</name>
+        <capacityParams>
+          <calcArea>true</calcArea>
+          <exp>1.0</exp>
+          <maxCost>0.0</maxCost>
+          <weightCost>false</weightCost>
+        </capacityParams>
+      </org.thema.graphab.habitat.MonoVectorHabitat>
+    </entry>
+  </habitats>
+  <linksets>
+    <entry>
+      <string>connections</string>
+      <EuclideLinkset>
+        <name>connections</name>
+        <habitat class="org.thema.graphab.habitat.MonoVectorHabitat" reference="../../../../habitats/entry/org.thema.graphab.habitat.MonoVectorHabitat"/>
+        <topology>PLANAR</topology>
+        <typeDist>EUCLID</typeDist>
+        <inter>false</inter>
+        <distMax>30000.0</distMax>
+        <realPaths>true</realPaths>
+      </EuclideLinkset>
+    </entry>
+  </linksets>
+  <graphs/>
+  <zone class="java.awt.geom.Rectangle2D$Double">
+    <x>2620698.052</x>
+    <y>1221173.284</y>
+    <width>56128.69799999986</width>
+    <height>53599.15500000003</height>
+  </zone>
+  <wktCRS>PROJCS[&quot;CH1903+ / LV95&quot;, &#xd;
+  GEOGCS[&quot;CH1903+&quot;, &#xd;
+    DATUM[&quot;CH1903+&quot;, &#xd;
+      SPHEROID[&quot;Bessel 1841&quot;, 6377397.155, 299.1528128, AUTHORITY[&quot;EPSG&quot;,&quot;7004&quot;]], &#xd;
+      TOWGS84[674.374, 15.056, 405.346, 0.0, 0.0, 0.0, 0.0], &#xd;
+      AUTHORITY[&quot;EPSG&quot;,&quot;6150&quot;]], &#xd;
+    PRIMEM[&quot;Greenwich&quot;, 0.0, AUTHORITY[&quot;EPSG&quot;,&quot;8901&quot;]], &#xd;
+    UNIT[&quot;degree&quot;, 0.017453292519943295], &#xd;
+    AXIS[&quot;Geodetic longitude&quot;, EAST], &#xd;
+    AXIS[&quot;Geodetic latitude&quot;, NORTH], &#xd;
+    AUTHORITY[&quot;EPSG&quot;,&quot;4150&quot;]], &#xd;
+  PROJECTION[&quot;Oblique_Mercator&quot;, AUTHORITY[&quot;EPSG&quot;,&quot;9815&quot;]], &#xd;
+  PARAMETER[&quot;longitude_of_center&quot;, 7.439583333333333], &#xd;
+  PARAMETER[&quot;latitude_of_center&quot;, 46.952405555555565], &#xd;
+  PARAMETER[&quot;azimuth&quot;, 90.0], &#xd;
+  PARAMETER[&quot;scale_factor&quot;, 1.0], &#xd;
+  PARAMETER[&quot;false_easting&quot;, 2600000.0], &#xd;
+  PARAMETER[&quot;false_northing&quot;, 1200000.0], &#xd;
+  PARAMETER[&quot;rectified_grid_angle&quot;, 90.0], &#xd;
+  UNIT[&quot;m&quot;, 1.0], &#xd;
+  AXIS[&quot;Easting&quot;, EAST], &#xd;
+  AXIS[&quot;Northing&quot;, NORTH], &#xd;
+  AUTHORITY[&quot;EPSG&quot;,&quot;2056&quot;]]</wktCRS>
+</Project>

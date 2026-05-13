@@ -1,0 +1,156 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <class>WildboarConnectivityDialogBase</class>
+ <widget class="QDialog" name="WildboarConnectivityDialogBase">
+  <property name="geometry">
+   <rect>
+    <x>0</x>
+    <y>0</y>
+    <width>480</width>
+    <height>460</height>
+   </rect>
+  </property>
+  <property name="windowTitle">
+   <string>Wildboar Connectivity v2</string>
+  </property>
+  <layout class="QVBoxLayout" name="verticalLayout">
+
+   <item>
+    <widget class="QGroupBox" name="grpInputs">
+     <property name="title">
+      <string>1. Inputs</string>
+     </property>
+     <layout class="QFormLayout" name="formInputs">
+      <item row="0" column="0">
+       <widget class="QLabel" name="lblRaster">
+        <property name="text">
+         <string>Resistance raster:</string>
+        </property>
+       </widget>
+      </item>
+      <item row="0" column="1">
+       <widget class="QgsMapLayerComboBox" name="cmbRaster"/>
+      </item>
+      <item row="1" column="0">
+       <widget class="QLabel" name="lblHabitats">
+        <property name="text">
+         <string>Core habitats (polygons):</string>
+        </property>
+       </widget>
+      </item>
+      <item row="1" column="1">
+       <widget class="QgsMapLayerComboBox" name="cmbHabitats"/>
+      </item>
+     </layout>
+    </widget>
+   </item>
+
+   <item>
+    <widget class="QGroupBox" name="grpRegion">
+     <property name="title">
+      <string>2. Pick a starting habitat &amp; range</string>
+     </property>
+     <layout class="QGridLayout" name="gridRegion">
+      <item row="0" column="0">
+       <widget class="QPushButton" name="btnPick">
+        <property name="text">
+         <string>Pick on map</string>
+        </property>
+       </widget>
+      </item>
+      <item row="0" column="1" colspan="2">
+       <widget class="QLabel" name="lblRegion">
+        <property name="text">
+         <string>&lt;not picked&gt;</string>
+        </property>
+        <property name="wordWrap">
+         <bool>true</bool>
+        </property>
+       </widget>
+      </item>
+      <item row="1" column="0">
+       <widget class="QLabel" name="lblRange">
+        <property name="text">
+         <string>Wild boar range:</string>
+        </property>
+       </widget>
+      </item>
+      <item row="1" column="1">
+       <widget class="QSpinBox" name="spnRangeKm">
+        <property name="minimum"><number>1</number></property>
+        <property name="maximum"><number>20</number></property>
+        <property name="value"><number>5</number></property>
+        <property name="suffix"><string> km</string></property>
+       </widget>
+      </item>
+      <item row="1" column="2">
+       <widget class="QCheckBox" name="chkShowBuffer">
+        <property name="text">
+         <string>Show buffer on map</string>
+        </property>
+        <property name="checked"><bool>true</bool></property>
+       </widget>
+      </item>
+     </layout>
+    </widget>
+   </item>
+
+   <item>
+    <widget class="QGroupBox" name="grpMethods">
+     <property name="title">
+      <string>3. Methods</string>
+     </property>
+     <layout class="QVBoxLayout" name="methodsLayout">
+      <item>
+       <widget class="QCheckBox" name="chkLcp">
+        <property name="text">
+         <string>Least-cost paths between all habitat pairs</string>
+        </property>
+        <property name="checked"><bool>true</bool></property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QCheckBox" name="chkCircuit">
+        <property name="text">
+         <string>Cumulative current flow / pinchpoints (Circuitscape style)</string>
+        </property>
+        <property name="checked"><bool>true</bool></property>
+       </widget>
+      </item>
+     </layout>
+    </widget>
+   </item>
+
+   <item>
+    <widget class="QPushButton" name="btnRun">
+     <property name="text">
+      <string>Run connectivity analysis</string>
+     </property>
+    </widget>
+   </item>
+
+   <item>
+    <widget class="QLabel" name="lblStatus">
+     <property name="text">
+      <string>Idle.</string>
+     </property>
+     <property name="wordWrap">
+      <bool>true</bool>
+     </property>
+    </widget>
+   </item>
+
+  </layout>
+ </widget>
+
+ <customwidgets>
+  <customwidget>
+   <class>QgsMapLayerComboBox</class>
+   <extends>QComboBox</extends>
+   <header>qgsmaplayercombobox.h</header>
+  </customwidget>
+ </customwidgets>
+
+ <resources/>
+ <connections/>
+</ui>

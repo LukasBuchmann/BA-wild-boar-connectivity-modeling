@@ -4,18 +4,17 @@ WildboarConnectivity v2 - main plugin module.
 
 Workflow
 --------
-1. User picks a resistance raster and the "Kerneinstaende" habitat polygon
+1. Pick a resistance raster and the "Kerneinstaende" habitat polygon
    layer from two dropdowns.
-2. User clicks one point on the canvas. The plugin selects the habitat
-   polygon that contains (or is nearest to) that click.
-3. The plugin buffers the selected habitat by a configurable "wild boar
-   range" (default 5 km) and collects every habitat polygon that
-   intersects the buffer. This restricts the analysis to a spatial scale
-   that is ecologically defensible for wild boar (typical daily movement
-   1-5 km, mean dispersal ~10 km).
-4. For all pairs of habitats inside the buffer the plugin computes:
-       - least-cost paths (Dijkstra, scikit-image)
-       - cumulative Circuitscape-style current flow (pinchpoints)
+2. Click ONE point on the map. The click defines the centre of a
+   circular movement neighbourhood whose radius is the configured
+   "wild boar range" (default 7 km; typical home-range radius is 1-4 km,
+   dispersal up to ~10 km, so 7 km is a defensible movement window).
+3. The plugin selects every habitat polygon intersecting that circle
+   and, for every pair of selected habitats, computes:
+       - a least-cost path (Dijkstra, scikit-image)
+       - a contribution to the cumulative Circuitscape current flow
+       - a weighted graph edge (1 / LCP cost) with node centrality
 
 Mathematical conversion of resistance to conductance
 ----------------------------------------------------
@@ -28,9 +27,10 @@ contributes half the path):
 
 The weighted graph Laplacian L = D - A (with D the diagonal of incident
 conductances) is solved against b = +1/n_s on source cells and -1/n_s on
-sink cells. Edge currents are g_ij * (v_i - v_j); node values are half
-the sum of |edge currents| on incident edges. The result is summed
-across all source/sink pairs to give the *cumulative* current map.
+sink cells (the habitat polygons themselves, rasterised onto the grid).
+Edge currents are g_ij * (v_i - v_j); node values are half the sum of
+|edge currents| on incident edges. Summed across all pairs this gives
+the cumulative current map; bright streaks = pinchpoints.
 """
 
 import json
@@ -57,6 +57,7 @@ from qgis.core import (
     QgsGeometry,
     QgsMapLayerProxyModel,
     QgsMessageLog,
+    QgsPointXY,
     QgsProject,
     QgsRasterLayer,
     QgsVectorLayer,
@@ -100,8 +101,7 @@ class WildboarConnectivity:
         # Runtime state.
         self.dlg = None
         self.point_tool = None
-        self.target_feature_id = None    # fid of the clicked habitat
-        self.target_layer_id = None      # which layer it was clicked on
+        self.center_point_canvas = None   # QgsPointXY in canvas CRS
         self.active_task = None
 
     # -----------------------------------------------------------------
@@ -112,7 +112,7 @@ class WildboarConnectivity:
     def initGui(self):
         icon_path = os.path.join(self.plugin_dir, "icon.png")
         action = QAction(QIcon(icon_path),
-                         self.tr("Habitat connectivity (LCP + pinchpoints)"),
+                         self.tr("Habitat connectivity (LCP + pinchpoints + graph)"),
                          self.iface.mainWindow())
         action.triggered.connect(self.run)
         self.iface.addToolBarIcon(action)
@@ -135,7 +135,7 @@ class WildboarConnectivity:
             self.dlg.cmbHabitats.setFilters(QgsMapLayerProxyModel.PolygonLayer)
 
             self.point_tool = PointSelectionTool(
-                self.canvas, role="region", color="#f1c40f")
+                self.canvas, role="center", color="#f1c40f")
             self.point_tool.point_selected.connect(self._on_point_selected)
 
             self.dlg.btnPick.clicked.connect(self._activate_picker)
@@ -146,72 +146,19 @@ class WildboarConnectivity:
         self.dlg.activateWindow()
 
     # -----------------------------------------------------------------
-    # Habitat picking
+    # Centre point picking (any point on the map - not tied to a habitat)
     # -----------------------------------------------------------------
     def _activate_picker(self):
-        if self.dlg.cmbHabitats.currentLayer() is None:
-            self._warn("Pick the habitats polygon layer first.")
-            return
-        self.dlg.lblStatus.setText("Click a habitat on the map...")
-        self.point_tool.activate_for_role("region")
+        self.dlg.lblStatus.setText(
+            "Click anywhere on the map to set the analysis centre...")
+        self.point_tool.activate_for_role("center")
 
     def _on_point_selected(self, point, role):
-        habitats = self.dlg.cmbHabitats.currentLayer()
-        if habitats is None:
-            self._warn("No habitats layer selected.")
-            return
-
-        # Transform canvas coords -> habitats CRS for the spatial query.
-        canvas_crs = self.canvas.mapSettings().destinationCrs()
-        tr = QgsCoordinateTransform(canvas_crs, habitats.crs(),
-                                    QgsProject.instance())
-        pt = tr.transform(point)
-        target = self._find_target_feature(habitats, pt)
-
-        if target is None:
-            self._warn("No habitat found near the click.")
-            return
-
-        self.target_feature_id = target.id()
-        self.target_layer_id = habitats.id()
+        self.center_point_canvas = QgsPointXY(point)
         self.dlg.lblRegion.setText(
-            f"Selected: {self._describe_feature(habitats, target)}")
+            f"Centre: {point.x():.1f}, {point.y():.1f}")
         self.dlg.lblStatus.setText(
-            "Habitat selected. Adjust range and press Run.")
-
-    @staticmethod
-    def _find_target_feature(layer, point_xy):
-        """Return the polygon containing the point, else the nearest."""
-        pt_geom = QgsGeometry.fromPointXY(point_xy)
-        nearest = None
-        nearest_d = float("inf")
-        # Pre-filter by bbox + small expansion to speed things up on big layers.
-        for f in layer.getFeatures():
-            g = f.geometry()
-            if g is None or g.isEmpty():
-                continue
-            if g.contains(pt_geom):
-                return f
-            d = g.distance(pt_geom)
-            if d < nearest_d:
-                nearest_d = d
-                nearest = f
-        return nearest
-
-    @staticmethod
-    def _describe_feature(layer, feature):
-        """Best-effort human-readable name for a habitat feature."""
-        for name_field in ("name", "Name", "NAME",
-                           "bezeichnung", "Bezeichnung",
-                           "id", "ID", "fid"):
-            i = layer.fields().indexOf(name_field)
-            if i >= 0:
-                val = feature.attribute(name_field)
-                if val not in (None, ""):
-                    area_km2 = feature.geometry().area() / 1e6
-                    return f"{name_field}={val}  (~{area_km2:.2f} km^2)"
-        area_km2 = feature.geometry().area() / 1e6
-        return f"fid={feature.id()}  (~{area_km2:.2f} km^2)"
+            "Centre captured. Adjust range and press Run.")
 
     # -----------------------------------------------------------------
     # Run analysis
@@ -227,23 +174,19 @@ class WildboarConnectivity:
         if habitats is None or not isinstance(habitats, QgsVectorLayer):
             self._warn("Select a habitats polygon layer.")
             return
-        if (habitats.geometryType() != QgsWkbTypes.PolygonGeometry):
+        if habitats.geometryType() != QgsWkbTypes.PolygonGeometry:
             self._warn("Habitat layer must be polygons.")
             return
-        if self.target_feature_id is None:
-            self._warn("Pick a starting habitat on the map.")
+        if self.center_point_canvas is None:
+            self._warn("Pick a centre point on the map.")
             return
         if not (self.dlg.chkLcp.isChecked()
-                or self.dlg.chkCircuit.isChecked()):
+                or self.dlg.chkCircuit.isChecked()
+                or self.dlg.chkGraph.isChecked()):
             self._warn("Enable at least one method.")
             return
 
-        target = habitats.getFeature(self.target_feature_id)
-        if not target.isValid():
-            self._warn("Selected habitat no longer exists in the layer.")
-            return
-
-        # ---- Build buffer in habitat CRS -------------------------------
+        # ---- Buffer the click point in the habitats CRS ---------------
         range_m = float(self.dlg.spnRangeKm.value()) * 1000.0
         habitats_crs = habitats.crs()
         if habitats_crs.isGeographic():
@@ -251,9 +194,28 @@ class WildboarConnectivity:
                        "CRS (e.g. EPSG:2056) so the range buffer is in meters.")
             return
 
-        buffer_geom = target.geometry().buffer(range_m, 24)
+        canvas_crs = self.canvas.mapSettings().destinationCrs()
+        tr_to_habitats = QgsCoordinateTransform(
+            canvas_crs, habitats_crs, QgsProject.instance())
+        center_in_habitats = tr_to_habitats.transform(self.center_point_canvas)
 
-        # All habitat features whose geometry touches the buffer.
+        center_geom = QgsGeometry.fromPointXY(center_in_habitats)
+        # Region = user-defined wild-boar range (drives habitat selection
+        # and the visible output extent).
+        buffer_geom = center_geom.buffer(range_m, 48)
+        # Computation region = region + edge buffer so the circuit solver
+        # has resistance cells outside the area of interest, avoiding the
+        # boundary artefact where current is artificially squeezed
+        # against the window edge. 30 % of the range (min 1.5 km) is
+        # typically enough for the radial 1/r decay to settle.
+        edge_buffer_m = max(range_m * 0.3, 1500.0)
+        compute_buffer_geom = center_geom.buffer(
+            range_m + edge_buffer_m, 48)
+
+        # All habitats whose geometry touches the *visible* region.
+        # Habitats outside the region (but inside the edge buffer) are
+        # NOT sources/sinks - the edge buffer only contributes pure
+        # resistance cells to absorb the boundary effect.
         req = (QgsFeatureRequest()
                .setFilterRect(buffer_geom.boundingBox())
                .setFlags(QgsFeatureRequest.ExactIntersect))
@@ -265,44 +227,56 @@ class WildboarConnectivity:
         if len(in_range) < 2:
             self._warn(
                 f"Only {len(in_range)} habitat(s) found within "
-                f"{range_m/1000:.0f} km. Increase the range.")
+                f"{range_m/1000:.0f} km of the centre. Move the point or "
+                f"increase the range.")
             return
 
         # ---- Transform geometries into the raster CRS ------------------
         raster_crs = raster.crs()
-        tr = QgsCoordinateTransform(habitats_crs, raster_crs,
-                                    QgsProject.instance())
+        tr_to_raster = QgsCoordinateTransform(
+            habitats_crs, raster_crs, QgsProject.instance())
+
+        # Visible region (in raster CRS): the geojson used to crop the
+        # output pinchpoint raster - so its rendered extent matches the
+        # user-defined circle exactly.
+        buffer_in_raster = QgsGeometry(buffer_geom)
+        buffer_in_raster.transform(tr_to_raster)
+        buffer_geojson = json.loads(buffer_in_raster.asJson())
+
+        # Computation window (in raster CRS): the bigger buffered circle's
+        # bbox. The solver runs on this larger grid; the output is then
+        # cropped/masked back to the user region.
+        compute_in_raster = QgsGeometry(compute_buffer_geom)
+        compute_in_raster.transform(tr_to_raster)
+        bbox_in_raster = compute_in_raster.boundingBox()
 
         habitats_data = []
-        bbox_in_raster = None
         for f in in_range:
             g = QgsGeometry(f.geometry())
-            g.transform(tr)
+            g.transform(tr_to_raster)
             geojson = json.loads(g.asJson())
+            centroid_pt = g.centroid().asPoint()
             habitats_data.append({
-                "id": int(f.id()),
-                "label": self._describe_feature(habitats, f),
-                "geojson": geojson,
-                "area": float(g.area()),
+                "id":       int(f.id()),
+                "label":    self._describe_feature(habitats, f),
+                "geojson":  geojson,
+                "area":     float(g.area()),
+                "centroid": (float(centroid_pt.x()), float(centroid_pt.y())),
             })
-            bb = g.boundingBox()
-            if bbox_in_raster is None:
-                bbox_in_raster = bb
-            else:
-                bbox_in_raster.combineExtentWith(bb)
+            # Habitats touching but partly outside the circle should
+            # still be fully captured by the computational window so
+            # their injection cells are not clipped. The output raster
+            # is masked back to the circle afterwards.
+            bbox_in_raster.combineExtentWith(g.boundingBox())
 
-        # Pad the analysis window so corridors can bend outside the
-        # tight habitat envelope. 500 m is generous for wild boar.
-        bbox_in_raster.grow(500.0)
-
-        # Confirm the window overlaps the raster.
         if not bbox_in_raster.intersects(raster.extent()):
             self._warn("Habitats do not overlap the raster extent.")
             return
 
         # ---- Visualize buffer + selected habitats on the map -----------
         if self.dlg.chkShowBuffer.isChecked():
-            self._show_region_preview(buffer_geom, habitats_crs, in_range)
+            self._show_region_preview(
+                center_in_habitats, buffer_geom, habitats_crs, in_range)
 
         # ---- Launch background task ------------------------------------
         window_bounds = (bbox_in_raster.xMinimum(),
@@ -318,19 +292,38 @@ class WildboarConnectivity:
         self.active_task = HabitatConnectivityTask(
             raster_path=raster.source(),
             habitats=habitats_data,
-            target_id=int(self.target_feature_id),
             window_bounds=window_bounds,
             crs_wkt=raster_crs.toWkt(),
             run_lcp=self.dlg.chkLcp.isChecked(),
             run_circuit=self.dlg.chkCircuit.isChecked(),
+            run_graph=self.dlg.chkGraph.isChecked(),
+            region_geojson=buffer_geojson,
         )
         QgsApplication.taskManager().addTask(self.active_task)
 
     # -----------------------------------------------------------------
-    def _show_region_preview(self, buffer_geom, crs, in_range_features):
-        """Add two memory layers showing what region is being analyzed."""
+    @staticmethod
+    def _describe_feature(layer, feature):
+        for name_field in ("name", "Name", "NAME",
+                           "bezeichnung", "Bezeichnung",
+                           "id", "ID", "fid"):
+            i = layer.fields().indexOf(name_field)
+            if i >= 0:
+                val = feature.attribute(name_field)
+                if val not in (None, ""):
+                    area_km2 = feature.geometry().area() / 1e6
+                    return f"{name_field}={val} (~{area_km2:.2f} km^2)"
+        area_km2 = feature.geometry().area() / 1e6
+        return f"fid={feature.id()} (~{area_km2:.2f} km^2)"
+
+    # -----------------------------------------------------------------
+    def _show_region_preview(self, center_pt, buffer_geom, crs,
+                             in_range_features):
+        """Add memory layers showing the analysis circle and the
+        habitats it selected."""
         authid = crs.authid() or "EPSG:2056"
 
+        # Buffer / range circle.
         buf = QgsVectorLayer(f"Polygon?crs={authid}",
                              "Analysis range (buffer)", "memory")
         prov = buf.dataProvider()
@@ -343,6 +336,21 @@ class WildboarConnectivity:
         sym.symbolLayer(0).setStrokeColor(QColor(241, 196, 15))
         QgsProject.instance().addMapLayer(buf)
 
+        # Centre point marker as a permanent layer (cleaner than just
+        # the on-canvas vertex marker which disappears after a refresh).
+        pt = QgsVectorLayer(f"Point?crs={authid}",
+                            "Analysis centre", "memory")
+        prov = pt.dataProvider()
+        ff = QgsFeature()
+        ff.setGeometry(QgsGeometry.fromPointXY(center_pt))
+        prov.addFeature(ff)
+        pt.updateExtents()
+        sym = pt.renderer().symbol()
+        sym.setColor(QColor(241, 196, 15))
+        sym.setSize(4.0)
+        QgsProject.instance().addMapLayer(pt)
+
+        # Selected habitats highlighted in green.
         sel = QgsVectorLayer(
             f"Polygon?crs={authid}",
             f"Selected habitats ({len(in_range_features)})", "memory")

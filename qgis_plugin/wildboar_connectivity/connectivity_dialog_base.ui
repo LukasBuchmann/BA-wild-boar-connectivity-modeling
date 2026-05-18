@@ -6,8 +6,8 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>480</width>
-    <height>460</height>
+    <width>490</width>
+    <height>470</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -48,13 +48,13 @@
    <item>
     <widget class="QGroupBox" name="grpRegion">
      <property name="title">
-      <string>2. Pick a starting habitat &amp; range</string>
+      <string>2. Pick a center point &amp; movement range</string>
      </property>
      <layout class="QGridLayout" name="gridRegion">
       <item row="0" column="0">
        <widget class="QPushButton" name="btnPick">
         <property name="text">
-         <string>Pick on map</string>
+         <string>Pick center point on map</string>
         </property>
        </widget>
       </item>
@@ -71,7 +71,7 @@
       <item row="1" column="0">
        <widget class="QLabel" name="lblRange">
         <property name="text">
-         <string>Wild boar range:</string>
+         <string>Wild boar range (radius):</string>
         </property>
        </widget>
       </item>
@@ -79,14 +79,17 @@
        <widget class="QSpinBox" name="spnRangeKm">
         <property name="minimum"><number>1</number></property>
         <property name="maximum"><number>20</number></property>
-        <property name="value"><number>5</number></property>
+        <property name="value"><number>7</number></property>
         <property name="suffix"><string> km</string></property>
+        <property name="toolTip">
+         <string>Typical wild boar home range radius is 1-4 km; dispersal up to ~10 km. 7 km covers a movement neighbourhood.</string>
+        </property>
        </widget>
       </item>
       <item row="1" column="2">
        <widget class="QCheckBox" name="chkShowBuffer">
         <property name="text">
-         <string>Show buffer on map</string>
+         <string>Show range on map</string>
         </property>
         <property name="checked"><bool>true</bool></property>
        </widget>
@@ -113,6 +116,14 @@
        <widget class="QCheckBox" name="chkCircuit">
         <property name="text">
          <string>Cumulative current flow / pinchpoints (Circuitscape style)</string>
+        </property>
+        <property name="checked"><bool>true</bool></property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QCheckBox" name="chkGraph">
+        <property name="text">
+         <string>Habitat network graph (centrality, weighted edges)</string>
         </property>
         <property name="checked"><bool>true</bool></property>
        </widget>

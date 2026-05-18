@@ -1,21 +1,25 @@
 [general]
 name=Wildboar Connectivity v2
 qgisMinimumVersion=3.0
-description=Point-to-point connectivity (LCP, Circuit Theory, Graph) across a resistance surface.
-version=0.2
+description=Pick one core habitat; compute LCPs and cumulative pinchpoints between all habitats inside a wild boar range buffer.
+version=0.3
 author=Lukas Buchmann
 email=buchmluk@students.zhaw.ch
 
 about=Interactive plugin for the BA "Wild Boar Connectivity Modeling" thesis.
-    Pick a resistance raster, click a start and end point on the canvas, and
-    compute the least-cost path, circuit-theory current flow / pinchpoints,
-    and a simple graph-based connectivity visualisation.
+    Select a resistance raster and the "Kerneinstaende" habitats polygon
+    layer, click one habitat on the map, set a wild boar range (default
+    5 km), and the plugin computes pairwise least-cost paths and a
+    cumulative Circuitscape-style current-flow / pinchpoint raster across
+    every pair of habitats inside the buffer. Restricting the analysis
+    to one local neighbourhood is ecologically defensible since wild boar
+    home ranges and dispersal distances rarely span an entire canton.
 
 tracker=https://github.com/
 repository=https://github.com/
 
 hasProcessingProvider=no
-tags=connectivity, least cost path, circuitscape, raster, ecology, wildlife
+tags=connectivity, least cost path, circuitscape, pinchpoints, wildlife, wild boar, ASF
 homepage=https://github.com/
 category=Plugins
 icon=icon.png

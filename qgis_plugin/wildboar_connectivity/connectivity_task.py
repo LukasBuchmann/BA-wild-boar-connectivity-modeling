@@ -1,34 +1,32 @@
 # -*- coding: utf-8 -*-
 """
-Background QgsTask that computes - for every pair of habitats inside the
-user-defined wild boar movement neighbourhood:
+Background QgsTask for the habitat-free ASF Wildboar Connectivity plugin.
 
-    * Pairwise least-cost paths (Dijkstra, scikit-image).
-    * Cumulative Circuitscape-style current-flow / pinchpoint raster.
-    * A weighted habitat NETWORK GRAPH: habitat centroids as nodes,
-      straight edges weighted by 1 / LCP cost, with degree and
-      betweenness-centrality scores per node (networkx).
+WORKFLOW (no core habitats needed):
 
-Math summary (full derivation in main_plugin.py docstring):
-    g_ij = 1 / (0.5 * (R_i + R_j))
-    L    = D - A  (weighted graph Laplacian, D = sum of incident g)
-    L v = b   with  b[A] = +1/|A|, b[B] = -1/|B| on habitat polygons A, B
-    I_e  = g_ij * (v_i - v_j)
-    Cum_e = sum over habitat pairs of |I_e|.
-    Pixel value = 0.5 * sum_{j ~ i} Cum(i,j).
+    Outbreak point  ->  one Dijkstra from the origin disc
+                    ->  cost-from-origin raster              (optional)
+                    ->  continuous infection-risk raster     (exp(-cost/scale))
+                    ->  one Circuit-theory solve             (origin -> AOI boundary)
+                          via Circuitscape.jl if available
+                          otherwise scipy.sparse fallback
+                    ->  optional random-walk visit density
 
-Performance: the Laplacian is factored ONCE (scipy splu) with a single
-corner cell grounded; every pair is then a fast back-substitution.
+The AOI is determined automatically from the cost grid: cells with cost
+above a multiple of the median become unreachable (effectively walls).
 """
 
 import os
 import tempfile
-import itertools
 
 import numpy as np
 import rasterio
 from rasterio.features import rasterize
-from rasterio.windows import from_bounds, Window, transform as window_transform
+from rasterio.windows import (
+    from_bounds,
+    Window,
+    transform as window_transform,
+)
 from rasterio.transform import xy as rio_xy
 
 from qgis.core import (
@@ -47,98 +45,184 @@ from qgis.PyQt.QtCore import QVariant
 from qgis.PyQt.QtGui import QColor
 from qgis.PyQt.QtWidgets import QMessageBox
 
+from .circuitscape_jl import (
+    CircuitscapeJlError,
+    is_julia_available,
+    is_circuitscape_installed,
+    run_one_to_all as run_circuitscape_jl,
+)
+from .layer_utils import ZOrder, add_wildboar_layer
+from .resistance_editor import apply_modifications
 
-LOG_TAG = "wildboar-v2"
+
+LOG_TAG = "wildboar-asf"
 
 
-class HabitatConnectivityTask(QgsTask):
-    """Pairwise LCPs, cumulative current flow, and a network graph
-    across every habitat inside the analysis window."""
+class AsfConnectivityTask(QgsTask):
+    """One-outbreak ASF connectivity analysis - no habitats input."""
 
     def __init__(self,
                  raster_path: str,
-                 habitats: list,         # [{id, label, geojson, area, centroid}]
-                 window_bounds: tuple,   # (min_x, min_y, max_x, max_y) raster CRS
-                 crs_wkt: str,           # raster CRS for output layers
-                 run_lcp: bool,
-                 run_circuit: bool,
-                 run_graph: bool,
-                 region_geojson: dict = None,   # buffer polygon in raster CRS
-                 ramp_name: str = "Magma"):
-        super().__init__("Wildboar habitat connectivity", QgsTask.CanCancel)
+                 origin_xy: tuple,            # (x, y) in raster CRS
+                 origin_radius_cells: int,    # disc radius in pixels (default 2)
+                 fences: list,                # list of LineString geojson dicts
+                 overpasses: list,            # list of (x, y) tuples
+                 window_bounds: tuple,
+                 crs_wkt: str,
+                 options: dict):
+        super().__init__("Wildboar ASF connectivity", QgsTask.CanCancel)
         self.raster_path = raster_path
-        self.habitats = habitats
+        self.origin_xy = origin_xy
+        self.origin_radius_cells = max(1, int(origin_radius_cells))
+        self.fences = fences
+        self.overpasses = overpasses
         self.window_bounds = window_bounds
         self.crs_wkt = crs_wkt
-        self.run_lcp = run_lcp
-        self.run_circuit = run_circuit
-        self.run_graph = run_graph
-        self.region_geojson = region_geojson
-        self.ramp_name = ramp_name
+        self.options = options
 
-        # Outputs filled by run(), consumed by finished().
-        self.lcp_records = []           # [{from_id, to_id, cost, points}]
+        # Outputs
+        self.cost_raster_path = None
+        self.risk_raster_path = None
         self.current_raster_path = None
-        self.graph_nodes = []           # [{id, centroid_xy, degree, betweenness, area}]
-        self.graph_edges = []           # [{from_id, to_id, cost, weight, from_xy, to_xy}]
-        self.n_pairs = 0
-        self.n_habitats = 0
+        self.walk_raster_path = None
+        self.merged_lcp_polylines = []   # list[{"points", "traffic"}]
+        self.forest_anchors = []         # list[((x, y), size)] - LCP targets
+        self.n_lcps = 0                  # number of synthetic LCPs computed
         self.exception = None
+
+        # Internal state
+        self.nodata_mask = None
+        self.aoi_mask = None
+        self._cost_grid = None
 
     # =================================================================
     # Worker thread
     # =================================================================
     def run(self):
         try:
-            arr, win_tf, crs, rows, cols, _nodata_mask = self._load_window()
+            arr, win_tf, crs, rows, cols = self._load_window()
 
-            habitat_masks = self._rasterize_habitats(arr.shape, win_tf)
-            self.n_habitats = len(habitat_masks)
-            if self.n_habitats < 2:
+            # Bake fences / overpasses into the working resistance grid.
+            if self.fences or self.overpasses:
+                arr = apply_modifications(
+                    arr, win_tf, self.fences, self.overpasses,
+                    fence_width_cells=2,
+                    overpass_radius_cells=2,
+                )
+                QgsMessageLog.logMessage(
+                    f"Applied {len(self.fences)} fence(s), "
+                    f"{len(self.overpasses)} overpass(es) "
+                    f"to the resistance window.",
+                    LOG_TAG, Qgis.Info)
+
+            # Cubic boar-resistance penalty: high-R pixels become near-walls.
+            arr = self._apply_boar_resistance_penalty(arr)
+
+            # ---- Rasterise the origin as a small disc on the grid ----
+            origin_cells = self._origin_disc_mask(arr.shape, win_tf)
+            if origin_cells.size == 0:
                 raise RuntimeError(
-                    f"Only {self.n_habitats} habitats rasterise onto the "
-                    f"raster window. Need at least 2.")
-
-            pairs = list(itertools.combinations(habitat_masks.keys(), 2))
-            self.n_pairs = len(pairs)
+                    "Outbreak point falls outside the resistance raster.")
             QgsMessageLog.logMessage(
-                f"Analysing {self.n_habitats} habitats, {self.n_pairs} pairs "
-                f"on a {rows}x{cols} window.", LOG_TAG, Qgis.Info)
+                f"Origin disc: {origin_cells.size} cell(s) at "
+                f"({self.origin_xy[0]:.1f}, {self.origin_xy[1]:.1f}); "
+                f"window {rows}x{cols}.",
+                LOG_TAG, Qgis.Info)
 
-            # ---- LCPs (cheap; also used by the graph step) -----------
-            need_lcp = self.run_lcp or self.run_graph
-            lcp_costs = {}
-            if need_lcp:
-                lcp_costs = self._compute_lcps(arr, win_tf, habitat_masks, pairs)
-                if not self.run_lcp:
-                    # User wanted graph only - don't add LCP layer, but
-                    # keep costs for the graph step.
-                    self.lcp_records = []
-            self.setProgress(35)
+            self.setProgress(10)
             if self.isCanceled():
                 return False
 
-            # ---- Cumulative current flow ------------------------------
-            if self.run_circuit:
-                self._compute_cumulative_currents(
-                    arr, win_tf, crs, habitat_masks, pairs)
-            self.setProgress(85)
+            # ---- Single Dijkstra from origin -------------------------
+            cost_grid, mcp = self._single_source_dijkstra(arr, origin_cells)
+            self._cost_grid = cost_grid
+            self.setProgress(25)
             if self.isCanceled():
                 return False
 
-            # ---- Network graph (needs lcp_costs) ----------------------
-            if self.run_graph:
-                self._build_graph(habitat_masks, pairs, lcp_costs)
+            # ---- Auto AOI from the cost grid -------------------------
+            self.aoi_mask = self._auto_aoi_mask(cost_grid, origin_cells,
+                                                arr.shape)
+            QgsMessageLog.logMessage(
+                f"AOI: {int(self.aoi_mask.sum())} cells "
+                f"({100 * self.aoi_mask.mean():.1f} % of window).",
+                LOG_TAG, Qgis.Info)
+
+            # ---- Cost-from-origin raster (optional) ------------------
+            if self.options.get("cost", False):
+                self.cost_raster_path = self._build_cost_raster(
+                    cost_grid, win_tf)
+            self.setProgress(33)
+            if self.isCanceled():
+                return False
+
+            # ---- LCPs to AUTO-DETECTED FOREST destinations -----------
+            if self.options.get("lcp", True):
+                self._build_lcps_to_forests(
+                    arr, win_tf, mcp,
+                    n_max_targets=int(self.options.get("n_lcp_targets", 12)))
+            self.setProgress(45)
+            if self.isCanceled():
+                return False
+
+            # ---- Continuous infection-risk RASTER --------------------
+            if self.options.get("risk", True):
+                self.risk_raster_path = self._build_risk_raster(
+                    cost_grid, win_tf)
+            self.setProgress(50)
+            if self.isCanceled():
+                return False
+
+            # ---- Pinchpoint raster (Circuitscape.jl preferred) -------
+            if self.options.get("circuit", True):
+                used_jl = False
+                if self.options.get("use_circuitscape_jl", True) \
+                        and is_julia_available() \
+                        and is_circuitscape_installed():
+                    try:
+                        used_jl = self._try_circuitscape_jl(
+                            arr, win_tf, origin_cells)
+                        if used_jl:
+                            QgsMessageLog.logMessage(
+                                "Pinchpoints computed via Circuitscape.jl.",
+                                LOG_TAG, Qgis.Success)
+                    except CircuitscapeJlError as exc:
+                        QgsMessageLog.logMessage(
+                            f"Circuitscape.jl failed ({exc}); "
+                            f"falling back to scipy solver.",
+                            LOG_TAG, Qgis.Warning)
+                        used_jl = False
+                    except Exception as exc:
+                        QgsMessageLog.logMessage(
+                            f"Circuitscape.jl crashed ({exc}); "
+                            f"falling back to scipy solver.",
+                            LOG_TAG, Qgis.Warning)
+                        used_jl = False
+                if not used_jl:
+                    self._single_source_current_scipy(
+                        arr, win_tf, crs, origin_cells)
+            self.setProgress(80)
+            if self.isCanceled():
+                return False
+
+            # ---- Optional: random walks ------------------------------
+            if self.options.get("random_walk", False):
+                self._random_walks(
+                    arr, win_tf, crs, origin_cells,
+                    n_walks=int(self.options.get("n_walks", 200)))
+
             self.setProgress(100)
             return True
 
         except Exception as exc:
             self.exception = exc
-            QgsMessageLog.logMessage(f"Task failed: {exc}",
-                                     LOG_TAG, Qgis.Critical)
+            QgsMessageLog.logMessage(
+                f"Task failed: {exc}", LOG_TAG, Qgis.Critical)
             return False
 
-    # -----------------------------------------------------------------
+    # =================================================================
+    # Loading and pre-processing
+    # =================================================================
     def _load_window(self):
         min_x, min_y, max_x, max_y = self.window_bounds
         with rasterio.open(self.raster_path) as src:
@@ -146,79 +230,346 @@ class HabitatConnectivityTask(QgsTask):
             win = from_bounds(min_x, min_y, max_x, max_y, src.transform)
             win = win.intersection(Window(0, 0, src.width, src.height))
             if win.width <= 0 or win.height <= 0:
-                raise RuntimeError("Analysis window does not overlap raster.")
-            arr = src.read(1, window=win).astype(np.float64)
+                raise RuntimeError(
+                    "Analysis window does not overlap the resistance raster.")
+            arr = src.read(1, window=win, boundless=True,
+                           fill_value=np.nan).astype(np.float64)
             win_tf = src.window_transform(win)
             nodata = src.nodata
 
-        nodata_mask = np.zeros(arr.shape, dtype=bool)
+        nodata_mask = ~np.isfinite(arr)
         if nodata is not None:
-            nodata_mask = (arr == nodata)
-            arr[nodata_mask] = 1e6
-        arr = np.clip(arr, 1e-3, 1e6)
-        return arr, win_tf, crs, arr.shape[0], arr.shape[1], nodata_mask
+            nodata_mask |= (arr == nodata)
+        arr[nodata_mask] = 1e6
+        np.clip(arr, 1e-3, 1e6, out=arr)
 
-    def _rasterize_habitats(self, shape, win_tf):
-        out = {}
-        for h in self.habitats:
-            mask = rasterize(
-                [(h["geojson"], 1)],
-                out_shape=shape,
-                transform=win_tf,
-                fill=0,
-                dtype="uint8",
-                all_touched=True,
-            )
-            flat = np.flatnonzero(mask.flatten())
-            if flat.size:
-                out[h["id"]] = flat
-        return out
+        self.nodata_mask = nodata_mask
+        return arr, win_tf, crs, arr.shape[0], arr.shape[1]
 
-    def _habitat_anchor_rc(self, flat_ids, rows, cols):
-        rr, cc = np.unravel_index(flat_ids, (rows, cols))
-        cr = int(round(rr.mean()))
-        cc_ = int(round(cc.mean()))
-        if cr * cols + cc_ in set(flat_ids.tolist()):
-            return cr, cc_
-        d2 = (rr - cr) ** 2 + (cc - cc_) ** 2
-        k = int(np.argmin(d2))
-        return int(rr[k]), int(cc[k])
+    def _apply_boar_resistance_penalty(self, arr):
+        """Cubic penalty so wild boar treat high-R pixels as near-walls."""
+        if self.nodata_mask is not None and self.nodata_mask.any():
+            valid = arr[~self.nodata_mask]
+        else:
+            valid = arr
+        if valid.size == 0:
+            return arr
+        R_typ = float(np.median(valid))
+        if R_typ <= 0 or not np.isfinite(R_typ):
+            R_typ = 1.0
+        R_max = float(np.max(valid))
+
+        eff = arr * (arr / R_typ) ** 2
+        np.clip(eff, 1e-3, 1e9, out=eff)
+        if self.nodata_mask is not None:
+            eff[self.nodata_mask] = 1e9
+
+        QgsMessageLog.logMessage(
+            f"Boar penalty: R_typical={R_typ:.2f}, R_max={R_max:.2f}, "
+            f"max-cell costs {(R_max ** 2 / R_typ ** 2):.0f}x a typical cell.",
+            LOG_TAG, Qgis.Info)
+        return eff
 
     # -----------------------------------------------------------------
-    def _compute_lcps(self, arr, win_tf, habitat_masks, pairs):
-        """Run Dijkstra for every pair. Returns {(a,b): cost} regardless
-        of whether the LCP layer itself will be added."""
-        from skimage.graph import route_through_array
+    # Origin disc rasterisation
+    # -----------------------------------------------------------------
+    def _origin_disc_mask(self, shape, win_tf):
+        """Return array of flat indices for the origin disc on the window."""
+        rows, cols = shape
+        try:
+            inv = ~win_tf
+        except Exception:
+            return np.array([], dtype=np.intp)
+        c0, r0 = inv * self.origin_xy
+        r0 = int(round(r0))
+        c0 = int(round(c0))
+        if not (0 <= r0 < rows and 0 <= c0 < cols):
+            return np.array([], dtype=np.intp)
+        radius = self.origin_radius_cells
+        cells = []
+        for dr in range(-radius, radius + 1):
+            for dc in range(-radius, radius + 1):
+                if dr * dr + dc * dc > radius * radius:
+                    continue
+                r, c = r0 + dr, c0 + dc
+                if 0 <= r < rows and 0 <= c < cols:
+                    cells.append(r * cols + c)
+        return np.array(cells, dtype=np.intp)
+
+    # -----------------------------------------------------------------
+    def _single_source_dijkstra(self, arr, origin_flat_ids):
+        from skimage.graph import MCP_Geometric
+        rows, cols = arr.shape
+        rr, cc = np.unravel_index(origin_flat_ids, (rows, cols))
+        starts = list(zip(rr.tolist(), cc.tolist()))
+        mcp = MCP_Geometric(arr, fully_connected=True)
+        cost_grid, _ = mcp.find_costs(starts)
+        return cost_grid, mcp
+
+    # -----------------------------------------------------------------
+    def _auto_aoi_mask(self, cost_grid, origin_flat_ids, shape):
+        """Cells reachable from origin with cost below an auto threshold.
+
+        Threshold = 4 x median(finite costs). With the cubic boar penalty
+        applied, this naturally cuts off areas behind barriers without a
+        user-defined radius.
+        """
+        rows, cols = shape
+        finite = cost_grid[np.isfinite(cost_grid)]
+        if finite.size == 0:
+            aoi = np.zeros(shape, dtype=bool)
+        else:
+            median = float(np.median(finite))
+            threshold = max(median * 4.0,
+                            float(np.percentile(finite, 60)) * 1.5)
+            aoi = np.isfinite(cost_grid) & (cost_grid <= threshold)
+        # Always include the origin disc.
+        rr, cc = np.unravel_index(origin_flat_ids, (rows, cols))
+        aoi[rr, cc] = True
+        return aoi
+
+    # -----------------------------------------------------------------
+    # AOI boundary cells - used as the Circuit-theory sink.
+    # -----------------------------------------------------------------
+    def _aoi_boundary_mask(self):
+        aoi = self.aoi_mask
+        if aoi is None:
+            return None
+        not_aoi = ~aoi
+        up    = np.zeros_like(aoi); up[:-1]    = not_aoi[1:]
+        down  = np.zeros_like(aoi); down[1:]   = not_aoi[:-1]
+        left  = np.zeros_like(aoi); left[:, :-1]  = not_aoi[:, 1:]
+        right = np.zeros_like(aoi); right[:, 1:]  = not_aoi[:, :-1]
+        return aoi & (up | down | left | right)
+
+    # -----------------------------------------------------------------
+    # LCPs to FOREST destinations (auto-detected from the resistance raster).
+    #
+    # Without core-habitat polygons, the destinations must come from the
+    # raster itself. Boars disperse toward attractive habitat, which on a
+    # boar-resistance surface is the LOW-resistance cells (forest). We:
+    #
+    #   1. Threshold the in-AOI valid cells at the 20th percentile to
+    #      isolate "forest" pixels.
+    #   2. Find connected components (scipy.ndimage.label, 8-connected).
+    #   3. Skip the patch(es) overlapping the origin disc - those are
+    #      the boar's own forest and "leading to itself" makes no sense.
+    #   4. Pick the largest N remaining patches and snap an anchor cell
+    #      to each (centroid, or nearest in-patch cell if the centroid
+    #      lies outside a concave patch).
+    #   5. Traceback through the MCP from each anchor.
+    #   6. Merge overlapping LCP segments into uniform-traffic runs.
+    #
+    # Output also includes a small "Forest destinations" point layer so
+    # the user can see WHERE the LCPs were aimed.
+    # -----------------------------------------------------------------
+    def _build_lcps_to_forests(self, arr, win_tf, mcp,
+                               n_max_targets=12,
+                               forest_quantile=0.20,
+                               min_patch_cells=5):
+        try:
+            from scipy.ndimage import label
+        except ImportError:
+            QgsMessageLog.logMessage(
+                "scipy.ndimage missing; LCPs skipped.",
+                LOG_TAG, Qgis.Warning)
+            return
+
         rows, cols = arr.shape
 
-        anchors = {hid: self._habitat_anchor_rc(idx, rows, cols)
-                   for hid, idx in habitat_masks.items()}
+        # --- Build the forest mask -----------------------------------
+        in_play = np.ones(arr.shape, dtype=bool)
+        if self.aoi_mask is not None:
+            in_play &= self.aoi_mask
+        if self.nodata_mask is not None:
+            in_play &= ~self.nodata_mask
+        valid_values = arr[in_play]
+        if valid_values.size == 0:
+            QgsMessageLog.logMessage(
+                "No valid in-AOI cells; LCPs skipped.",
+                LOG_TAG, Qgis.Warning)
+            return
+        threshold = float(np.percentile(valid_values,
+                                        100.0 * forest_quantile))
+        forest_mask = (arr <= threshold) & in_play
 
-        lcp_costs = {}
-        for k, (a, b) in enumerate(pairs):
-            if self.isCanceled():
-                return lcp_costs
+        if not forest_mask.any():
+            QgsMessageLog.logMessage(
+                "No forest pixels under threshold; LCPs skipped.",
+                LOG_TAG, Qgis.Warning)
+            return
+
+        # --- Connected components (8-connected, like our Dijkstra) ---
+        labeled, n_features = label(forest_mask,
+                                    structure=np.ones((3, 3), dtype=int))
+        if n_features == 0:
+            return
+
+        # --- Identify the patch(es) overlapping the origin disc ------
+        origin_ids = self._origin_disc_mask((rows, cols), win_tf)
+        origin_patch_ids = set()
+        if origin_ids.size:
+            orr, occ = np.unravel_index(origin_ids, (rows, cols))
+            lab_at_origin = labeled[orr, occ]
+            origin_patch_ids = {int(v) for v in lab_at_origin if v > 0}
+
+        # --- Anchor cell per (non-origin) patch ----------------------
+        patches = []   # list of (anchor_row, anchor_col, size)
+        for cid in range(1, n_features + 1):
+            if cid in origin_patch_ids:
+                continue
+            rr_p, cc_p = np.where(labeled == cid)
+            size = rr_p.size
+            if size < min_patch_cells:
+                continue
+            cr = int(round(float(rr_p.mean())))
+            cc = int(round(float(cc_p.mean())))
+            if labeled[cr, cc] != cid:
+                # Concave patch: snap centroid to the closest in-patch cell.
+                d2 = (rr_p - cr) ** 2 + (cc_p - cc) ** 2
+                k = int(np.argmin(d2))
+                cr, cc = int(rr_p[k]), int(cc_p[k])
+            patches.append((cr, cc, size))
+
+        if not patches:
+            QgsMessageLog.logMessage(
+                "Only the origin's own forest is in the AOI; no LCPs.",
+                LOG_TAG, Qgis.Info)
+            return
+
+        # Largest forests first; cap at n_max_targets.
+        patches.sort(key=lambda p: -p[2])
+        patches = patches[:int(n_max_targets)]
+        QgsMessageLog.logMessage(
+            f"LCP forest destinations: {len(patches)} patches "
+            f"(sizes: {[p[2] for p in patches[:5]]}...).",
+            LOG_TAG, Qgis.Info)
+
+        # Remember anchors for the visualisation layer (in world coords).
+        self.forest_anchors = [
+            (rio_xy(win_tf, r, c), size) for (r, c, size) in patches
+        ]
+
+        # --- Traceback each anchor --------------------------------------
+        paths = []
+        for r, c, _size in patches:
             try:
-                indices, cost = route_through_array(
-                    arr, anchors[a], anchors[b],
-                    fully_connected=True, geometric=True)
-                pts = [QgsPointXY(*rio_xy(win_tf, r, c)) for r, c in indices]
-                lcp_costs[(a, b)] = float(cost)
-                self.lcp_records.append({
-                    "from_id": int(a), "to_id": int(b),
-                    "cost": float(cost), "points": pts,
-                })
-            except Exception as exc:
-                QgsMessageLog.logMessage(
-                    f"LCP {a}<->{b} failed: {exc}", LOG_TAG, Qgis.Warning)
-            self.setProgress(5 + 25 * (k + 1) / max(1, self.n_pairs))
-        return lcp_costs
+                indices = mcp.traceback((r, c))
+            except Exception:
+                continue
+            cells = [(int(ri), int(ci)) for ri, ci in indices]
+            if len(cells) >= 2:
+                paths.append(cells)
+        self.n_lcps = len(paths)
+        if not paths:
+            return
+
+        # --- Merge into uniform-traffic polylines ---------------------
+        from collections import defaultdict
+        edge_count = defaultdict(int)
+        for cells in paths:
+            for a, b in zip(cells, cells[1:]):
+                edge = (a, b) if a < b else (b, a)
+                edge_count[edge] += 1
+
+        visited = set()
+        runs = []
+        for cells in paths:
+            seg_cells = []
+            seg_count = None
+            for a, b in zip(cells, cells[1:]):
+                edge = (a, b) if a < b else (b, a)
+                if edge in visited:
+                    if seg_count is not None and len(seg_cells) >= 2:
+                        runs.append((seg_cells, seg_count))
+                    seg_cells = []
+                    seg_count = None
+                    continue
+                visited.add(edge)
+                c = edge_count[edge]
+                if seg_count is None:
+                    seg_cells = [a, b]
+                    seg_count = c
+                elif c == seg_count:
+                    seg_cells.append(b)
+                else:
+                    runs.append((seg_cells, seg_count))
+                    seg_cells = [a, b]
+                    seg_count = c
+            if seg_count is not None and len(seg_cells) >= 2:
+                runs.append((seg_cells, seg_count))
+
+        for cells, count in runs:
+            pts = [QgsPointXY(*rio_xy(win_tf, r, c)) for r, c in cells]
+            self.merged_lcp_polylines.append({
+                "points":  pts,
+                "traffic": int(count),
+            })
+
+    # =================================================================
+    # Output rasters
+    # =================================================================
+    def _build_cost_raster(self, cost_grid, win_tf):
+        """Optional: raw cost-from-origin (Dijkstra cost grid)."""
+        return self._mask_crop_write_raster(
+            cost_grid.astype(np.float32), win_tf, prefix="cost")
+
+    def _build_risk_raster(self, cost_grid, win_tf):
+        """Continuous infection-risk raster: exp(-cost / median_cost)."""
+        rows, cols = cost_grid.shape
+        in_aoi = cost_grid[self.aoi_mask] if self.aoi_mask is not None else cost_grid
+        finite = in_aoi[np.isfinite(in_aoi)]
+        scale = float(np.median(finite)) if finite.size else 1.0
+        if scale <= 0:
+            scale = 1.0
+        risk = np.exp(-cost_grid / scale)
+        risk[~np.isfinite(cost_grid)] = np.nan
+        return self._mask_crop_write_raster(
+            risk.astype(np.float32), win_tf, prefix="risk")
 
     # -----------------------------------------------------------------
-    def _compute_cumulative_currents(self, arr, win_tf, crs,
-                                     habitat_masks, pairs):
+    # Pinchpoint raster: Circuit theory with AOI boundary as sink.
+    # -----------------------------------------------------------------
+    def _try_circuitscape_jl(self, arr, win_tf, origin_flat_ids):
+        rows, cols = arr.shape
+        source_mask = np.zeros((rows, cols), dtype=bool)
+        srr, scc = np.unravel_index(origin_flat_ids, (rows, cols))
+        source_mask[srr, scc] = True
+
+        sink_mask = self._aoi_boundary_mask()
+        if sink_mask is None or not sink_mask.any():
+            return False
+
+        cs_resistance = arr.astype(np.float64, copy=True)
+        if self.nodata_mask is not None:
+            cs_resistance[self.nodata_mask] = np.nan
+        if self.aoi_mask is not None:
+            cs_resistance[~self.aoi_mask] = np.nan
+
+        def _log(msg):
+            QgsMessageLog.logMessage(msg, LOG_TAG, Qgis.Info)
+
+        current = run_circuitscape_jl(
+            cs_resistance, win_tf,
+            source_mask=source_mask,
+            sink_mask=sink_mask,
+            log=_log,
+        )
+
+        finite = current[np.isfinite(current) & (current > 0)]
+        floor = max(float(np.percentile(finite, 1)), 1e-12) \
+                if finite.size else 1e-12
+        with np.errstate(divide="ignore", invalid="ignore"):
+            log_curr = np.log10(np.maximum(current, floor))
+        log_curr[~np.isfinite(current)] = np.nan
+        self.current_raster_path = self._mask_crop_write_raster(
+            log_curr.astype(np.float32), win_tf, prefix="pinchpoints_cs")
+        return True
+
+    def _single_source_current_scipy(self, arr, win_tf, crs, origin_flat_ids):
+        """scipy fallback: assemble L, solve once for origin disc vs AOI border."""
         from scipy.sparse import coo_matrix
-        from scipy.sparse.linalg import splu
+        from scipy.sparse.linalg import spsolve
 
         rows, cols = arr.shape
         n = rows * cols
@@ -238,174 +589,173 @@ class HabitatConnectivityTask(QgsTask):
         col  = np.concatenate([   e_j,    e_i,    e_i,    e_j])
         L = coo_matrix((data, (row, col)), shape=(n, n)).tocsc()
 
-        # Ground one cell and factor ONCE.
-        ground = 0
+        # Source: origin disc.
+        bvec = np.zeros(n)
+        bvec[origin_flat_ids] += 1.0 / origin_flat_ids.size
+
+        # Sink: AOI boundary cells.
+        sink_mask = self._aoi_boundary_mask()
+        if sink_mask is None or not sink_mask.any():
+            return
+        sink_ids = np.flatnonzero(sink_mask.flatten())
+        bvec[sink_ids] -= 1.0 / sink_ids.size
+
+        ground = int(sink_ids[0])
         keep = np.ones(n, dtype=bool)
         keep[ground] = False
         L_red = L[keep][:, keep]
-        self.setProgress(45)
-        lu = splu(L_red)
-        self.setProgress(55)
+        b_red = bvec[keep]
 
-        cum_edge = np.zeros(e_i.size, dtype=np.float64)
+        v_red = spsolve(L_red, b_red)
+        v = np.zeros(n)
+        v[keep] = v_red
 
-        for k, (a, b) in enumerate(pairs):
+        edge_I = g_edge * (v[e_i] - v[e_j])
+        node_current = np.zeros(n)
+        np.add.at(node_current, e_i, np.abs(edge_I))
+        np.add.at(node_current, e_j, np.abs(edge_I))
+        node_current *= 0.5
+        node_current = node_current.reshape(rows, cols).astype(np.float64)
+
+        finite = node_current[node_current > 0]
+        floor = max(float(np.percentile(finite, 1)), 1e-12) \
+                if finite.size else 1e-12
+        with np.errstate(divide="ignore", invalid="ignore"):
+            log_curr = np.log10(np.maximum(node_current, floor))
+        log_curr = log_curr.astype(np.float32)
+        self.current_raster_path = self._mask_crop_write_raster(
+            log_curr, win_tf, prefix="pinchpoints")
+
+    # -----------------------------------------------------------------
+    # Random walks from the origin disc.
+    #
+    # Biological / numerical correctness:
+    #   - 8-connected, but diagonal moves cost sqrt(2) more than
+    #     orthogonal ones. We weight by 1 / (R_neighbour * step_distance)
+    #     so the walker doesn't artificially prefer diagonals.
+    #   - NoData neighbours are excluded outright (a boar never steps
+    #     into a cell with no resistance data).
+    #   - Walk terminates when leaving the AOI - that's the realistic
+    #     boundary of boar dispersal.
+    # The output raster sits on the same pixel grid as the resistance
+    # raster (window_transform preserves alignment), so overlays in QGIS
+    # line up cell-for-cell.
+    # -----------------------------------------------------------------
+    def _random_walks(self, arr, win_tf, crs, origin_flat_ids,
+                      n_walks=200, max_steps=2000):
+        rows, cols = arr.shape
+        rr, cc = np.unravel_index(origin_flat_ids, (rows, cols))
+        starts = np.column_stack([rr, cc])
+
+        visit = np.zeros((rows, cols), dtype=np.int32)
+        rng = np.random.default_rng()
+
+        offsets = np.array([
+            (-1, -1), (-1, 0), (-1, 1),
+            ( 0, -1),          ( 0, 1),
+            ( 1, -1), ( 1, 0), ( 1, 1),
+        ], dtype=np.intp)
+        # Step distance per offset: orthogonal = 1, diagonal = sqrt(2).
+        SQ2 = float(np.sqrt(2.0))
+        step_dist = np.array([
+            SQ2, 1.0, SQ2,
+            1.0,      1.0,
+            SQ2, 1.0, SQ2,
+        ], dtype=np.float64)
+
+        aoi    = self.aoi_mask
+        nodata = self.nodata_mask
+
+        for _ in range(n_walks):
             if self.isCanceled():
                 return
-            a_ids = habitat_masks[a]
-            b_ids = habitat_masks[b]
-            bvec = np.zeros(n)
-            bvec[a_ids] += 1.0 / a_ids.size
-            bvec[b_ids] -= 1.0 / b_ids.size
-            b_red = bvec[keep]
+            r, c = starts[rng.integers(0, len(starts))]
+            r, c = int(r), int(c)
+            for _ in range(max_steps):
+                visit[r, c] += 1
+                # Stop once outside the AOI.
+                if aoi is not None and not aoi[r, c]:
+                    break
 
-            v_red = lu.solve(b_red)
-            v = np.zeros(n)
-            v[keep] = v_red
+                nrs = r + offsets[:, 0]
+                ncs = c + offsets[:, 1]
+                ok = (nrs >= 0) & (nrs < rows) \
+                   & (ncs >= 0) & (ncs < cols)
 
-            edge_I = g_edge * (v[e_i] - v[e_j])
-            cum_edge += np.abs(edge_I)
-            self.setProgress(55 + 25 * (k + 1) / max(1, self.n_pairs))
+                # Exclude NoData neighbours (boars don't walk into "no data").
+                if nodata is not None and ok.any():
+                    safe_r = np.clip(nrs, 0, rows - 1)
+                    safe_c = np.clip(ncs, 0, cols - 1)
+                    ok = ok & ~nodata[safe_r, safe_c]
 
-        node_current = np.zeros(n)
-        np.add.at(node_current, e_i, cum_edge)
-        np.add.at(node_current, e_j, cum_edge)
-        node_current *= 0.5
-        node_current = node_current.reshape(rows, cols)
+                if not ok.any():
+                    break
 
-        # Mask habitat cells (core habitat, not corridor).
-        all_habitat_idx = np.concatenate(list(habitat_masks.values()))
-        hr, hc = np.unravel_index(all_habitat_idx, (rows, cols))
-        node_current[hr, hc] = np.nan
+                nrs_ok = nrs[ok]
+                ncs_ok = ncs[ok]
+                dists  = step_dist[ok]
+                # Step cost = R_neighbour * step_distance; pick neighbour
+                # with probability inversely proportional to that cost.
+                w = 1.0 / (arr[nrs_ok, ncs_ok] * dists)
+                w /= w.sum()
+                k = rng.choice(len(nrs_ok), p=w)
+                r, c = int(nrs_ok[k]), int(ncs_ok[k])
 
-        # ---- Clip to the user-defined circular region ----------------
-        # Computation ran on the bigger habitat-bbox window (so partial
-        # habitats are not clipped); the OUTPUT raster is masked to the
-        # circle so its visible extent matches the analysis range
-        # exactly.
-        if self.region_geojson is not None:
-            inside_region = rasterize(
-                [(self.region_geojson, 1)],
-                out_shape=node_current.shape,
-                transform=win_tf,
-                fill=0,
-                dtype="uint8",
-                all_touched=False,
-            ).astype(bool)
-            node_current[~inside_region] = np.nan
+        if visit.any():
+            grid = visit.astype(np.float32)
+            grid[grid == 0] = np.nan
+            self.walk_raster_path = self._mask_crop_write_raster(
+                grid, win_tf, prefix="random_walk")
+
+    # =================================================================
+    # Mask + crop + write helper
+    # =================================================================
+    def _mask_crop_write_raster(self, grid, win_tf, prefix):
+        """Apply AOI + NoData mask, crop tightly, save GeoTIFF."""
+        grid = grid.astype(np.float32, copy=True)
+
+        if self.aoi_mask is not None and self.aoi_mask.shape == grid.shape:
+            inside = self.aoi_mask
         else:
-            inside_region = np.ones(node_current.shape, dtype=bool)
+            inside = np.ones(grid.shape, dtype=bool)
+        if self.nodata_mask is not None \
+                and self.nodata_mask.shape == grid.shape:
+            inside = inside & ~self.nodata_mask
 
-        # log10 stretch (Circuitscape convention).
-        finite = node_current[np.isfinite(node_current)]
-        if finite.size:
-            noise_floor = max(float(np.percentile(finite, 1)), 1e-12)
-        else:
-            noise_floor = 1e-12
-        with np.errstate(divide="ignore", invalid="ignore"):
-            log_curr = np.log10(np.maximum(node_current, noise_floor))
-        log_curr[~np.isfinite(node_current)] = np.nan
+        grid[~inside] = np.nan
 
-        # ---- Crop the GeoTIFF tightly around the circle --------------
-        # Find the bounding box of cells inside the region; the output
-        # raster's extent ends up as the minimum rectangle that still
-        # contains the full circle (no surrounding empty padding).
-        valid_rows = np.where(inside_region.any(axis=1))[0]
-        valid_cols = np.where(inside_region.any(axis=0))[0]
-        if valid_rows.size and valid_cols.size:
-            r0, r1 = int(valid_rows[0]), int(valid_rows[-1]) + 1
-            c0, c1 = int(valid_cols[0]), int(valid_cols[-1]) + 1
-        else:
-            r0, r1, c0, c1 = 0, rows, 0, cols
-        log_curr = log_curr[r0:r1, c0:c1]
+        v_rows = np.where(inside.any(axis=1))[0]
+        v_cols = np.where(inside.any(axis=0))[0]
+        if not v_rows.size or not v_cols.size:
+            return None
+        r0, r1 = int(v_rows[0]), int(v_rows[-1]) + 1
+        c0, c1 = int(v_cols[0]), int(v_cols[-1]) + 1
+        grid = grid[r0:r1, c0:c1]
         out_tf = window_transform(Window(c0, r0, c1 - c0, r1 - r0), win_tf)
-        out_h, out_w = log_curr.shape
+        out_h, out_w = grid.shape
 
-        out_arr = np.where(np.isnan(log_curr), -9999.0,
-                           log_curr).astype(np.float32)
-        out_path = os.path.join(tempfile.gettempdir(),
-                                f"wildboar_pinchpoints_{os.getpid()}.tif")
+        out_arr = np.where(np.isnan(grid), -9999.0, grid).astype(np.float32)
+        out_path = os.path.join(
+            tempfile.gettempdir(),
+            f"wildboar_{prefix}_{os.getpid()}.tif")
+        from rasterio.crs import CRS
+        try:
+            crs = CRS.from_wkt(self.crs_wkt)
+        except Exception:
+            crs = None
         with rasterio.open(
             out_path, "w",
             driver="GTiff",
             height=out_h, width=out_w, count=1,
             dtype="float32",
-            crs=crs,
-            transform=out_tf,
+            crs=crs, transform=out_tf,
             nodata=-9999,
         ) as dst:
             dst.write(out_arr, 1)
-        self.current_raster_path = out_path
-
-    # -----------------------------------------------------------------
-    def _build_graph(self, habitat_masks, pairs, lcp_costs):
-        """Build a NetworkX graph with habitats as nodes and 1/LCP cost
-        as edge weight. Compute degree and betweenness centrality.
-
-        Why these metrics?
-            * degree           = how many other habitats this one connects
-                                 to (with finite cost). Robustness indicator.
-            * betweenness      = fraction of all habitat-to-habitat
-                                 shortest paths that pass through this
-                                 habitat. High = critical stepping stone.
-
-        Outputs are stored as plain dicts; the UI thread builds the
-        actual QgsVectorLayers in finished().
-        """
-        try:
-            import networkx as nx
-        except ImportError:
-            QgsMessageLog.logMessage(
-                "networkx not installed; skipping graph step.",
-                LOG_TAG, Qgis.Warning)
-            return
-
-        # Look up centroids from the habitats payload we were given.
-        centroid_by_id = {h["id"]: h["centroid"] for h in self.habitats
-                          if h["id"] in habitat_masks}
-        area_by_id = {h["id"]: h["area"] for h in self.habitats
-                      if h["id"] in habitat_masks}
-
-        G = nx.Graph()
-        for hid in habitat_masks.keys():
-            G.add_node(hid)
-
-        for (a, b) in pairs:
-            cost = lcp_costs.get((a, b))
-            if cost is None or cost <= 0 or not np.isfinite(cost):
-                continue
-            G.add_edge(a, b,
-                       cost=cost,
-                       weight=1.0 / cost)  # higher = stronger connection
-
-        # Shortest-path distance for betweenness uses raw LCP cost.
-        try:
-            betw = nx.betweenness_centrality(G, weight="cost", normalized=True)
-        except Exception:
-            betw = {n: 0.0 for n in G.nodes}
-        degree = dict(G.degree())
-
-        for hid in G.nodes:
-            self.graph_nodes.append({
-                "id":          int(hid),
-                "centroid_xy": centroid_by_id.get(hid, (0.0, 0.0)),
-                "degree":      int(degree.get(hid, 0)),
-                "betweenness": float(betw.get(hid, 0.0)),
-                "area":        float(area_by_id.get(hid, 0.0)),
-            })
-
-        for (a, b, d) in G.edges(data=True):
-            self.graph_edges.append({
-                "from_id": int(a),
-                "to_id":   int(b),
-                "cost":    float(d["cost"]),
-                "weight":  float(d["weight"]),
-                "from_xy": centroid_by_id.get(a, (0.0, 0.0)),
-                "to_xy":   centroid_by_id.get(b, (0.0, 0.0)),
-            })
+        return out_path
 
     # =================================================================
-    # UI thread: layer creation
+    # UI thread: finalisation
     # =================================================================
     def finished(self, ok):
         if not ok:
@@ -414,108 +764,144 @@ class HabitatConnectivityTask(QgsTask):
             QMessageBox.critical(None, "Wildboar Connectivity", msg)
             return
 
-        # --- LCP corridor layer ----------------------------------------
-        if self.lcp_records:
-            layer = QgsVectorLayer(
-                f"LineString?crs={self.crs_wkt}",
-                f"LCP corridors ({len(self.lcp_records)} pairs)",
-                "memory")
-            prov = layer.dataProvider()
-            prov.addAttributes([
-                QgsField("from_id", QVariant.Int),
-                QgsField("to_id", QVariant.Int),
-                QgsField("cost",    QVariant.Double),
-            ])
-            layer.updateFields()
-            for rec in self.lcp_records:
-                f = QgsFeature()
-                f.setGeometry(QgsGeometry.fromPolylineXY(rec["points"]))
-                f.setAttributes([rec["from_id"], rec["to_id"], rec["cost"]])
-                prov.addFeature(f)
-            layer.updateExtents()
-            sym = layer.renderer().symbol()
-            sym.setWidth(1.4)
-            sym.setColor(QColor("#d62728"))
-            QgsProject.instance().addMapLayer(layer)
+        # LCP corridors as merged lines (one feature per uniform-traffic run)
+        if self.merged_lcp_polylines:
+            self._add_lcp_lines_layer()
+        # Visual anchors showing what the LCPs were aimed at.
+        if self.forest_anchors:
+            self._add_forest_anchors_layer()
 
-        # --- Cumulative current / pinchpoints raster -------------------
+        # Pinchpoint raster (the corridor map)
         if self.current_raster_path:
-            rlayer = QgsRasterLayer(
-                self.current_raster_path,
-                f"Pinchpoints (log10 cum. current, {self.n_pairs} pairs)")
-            if rlayer.isValid():
-                self._apply_singleband_ramp(rlayer, self.ramp_name)
-                QgsProject.instance().addMapLayer(rlayer)
+            r = QgsRasterLayer(self.current_raster_path,
+                               "Pinchpoints / corridors (log10 current)")
+            if r.isValid():
+                self._apply_singleband_ramp(r, "Magma")
+                add_wildboar_layer(r, ZOrder.PINCHPOINTS)
 
-        # --- Graph: edges & nodes --------------------------------------
-        if self.graph_edges:
-            self._add_graph_edges_layer()
-        if self.graph_nodes:
-            self._add_graph_nodes_layer()
+        # Continuous infection-risk raster
+        if self.risk_raster_path:
+            r = QgsRasterLayer(self.risk_raster_path,
+                               "Infection risk (continuous)")
+            if r.isValid():
+                self._apply_risk_ramp(r)
+                add_wildboar_layer(r, ZOrder.SELECTED_HABITATS + 1)
+
+        # Optional cost-from-origin raster
+        if self.cost_raster_path:
+            r = QgsRasterLayer(self.cost_raster_path,
+                               "Cost-from-origin (boar distance surface)")
+            if r.isValid():
+                self._apply_singleband_ramp(r, "Viridis")
+                add_wildboar_layer(r, ZOrder.LCP_TRAFFIC)
+
+        # Optional random walk density
+        if self.walk_raster_path:
+            r = QgsRasterLayer(
+                self.walk_raster_path,
+                f"Random walk density (n={int(self.options.get('n_walks', 200))})")
+            if r.isValid():
+                self._apply_singleband_ramp(r, "Viridis")
+                add_wildboar_layer(r, ZOrder.GRAPH_EDGES)
 
         QgsMessageLog.logMessage(
-            f"Done. habitats={self.n_habitats}, pairs={self.n_pairs}, "
-            f"LCPs={len(self.lcp_records)}, "
-            f"pinchpoints={'yes' if self.current_raster_path else 'no'}, "
-            f"graph={'yes' if self.graph_edges else 'no'}.",
+            "Done. lcps={l}({s} segments) pinch={p} risk={r} "
+            "cost={c} walks={w}".format(
+                l=self.n_lcps,
+                s=len(self.merged_lcp_polylines),
+                p="yes" if self.current_raster_path else "no",
+                r="yes" if self.risk_raster_path else "no",
+                c="yes" if self.cost_raster_path else "no",
+                w="yes" if self.walk_raster_path else "no"),
             LOG_TAG, Qgis.Success)
 
     # -----------------------------------------------------------------
-    def _add_graph_edges_layer(self):
+    def _add_lcp_lines_layer(self):
+        """Render merged LCP polylines, styled by traffic count.
+
+        Three classes (thin grey -> orange -> thick dark red) make the
+        corridor backbone visually obvious without further user styling.
+        """
+        from qgis.core import (
+            QgsGraduatedSymbolRenderer,
+            QgsRendererRange,
+            QgsSymbol,
+        )
+        polys = self.merged_lcp_polylines
+        if not polys:
+            return
         layer = QgsVectorLayer(
             f"LineString?crs={self.crs_wkt}",
-            f"Habitat graph - edges ({len(self.graph_edges)})",
+            f"LCP corridors (merged, {len(polys)} segments, "
+            f"{self.n_lcps} paths)",
             "memory")
         prov = layer.dataProvider()
-        prov.addAttributes([
-            QgsField("from_id", QVariant.Int),
-            QgsField("to_id",   QVariant.Int),
-            QgsField("cost",    QVariant.Double),
-            QgsField("weight",  QVariant.Double),
-        ])
+        prov.addAttributes([QgsField("traffic", QVariant.Int)])
         layer.updateFields()
-        for e in self.graph_edges:
-            f = QgsFeature()
-            f.setGeometry(QgsGeometry.fromPolylineXY([
-                QgsPointXY(*e["from_xy"]),
-                QgsPointXY(*e["to_xy"]),
-            ]))
-            f.setAttributes([e["from_id"], e["to_id"], e["cost"], e["weight"]])
-            prov.addFeature(f)
-        layer.updateExtents()
-        sym = layer.renderer().symbol()
-        sym.setColor(QColor(52, 152, 219, 180))   # translucent blue
-        sym.setWidth(0.6)
-        QgsProject.instance().addMapLayer(layer)
 
-    def _add_graph_nodes_layer(self):
-        layer = QgsVectorLayer(
-            f"Point?crs={self.crs_wkt}",
-            f"Habitat graph - nodes ({len(self.graph_nodes)})",
-            "memory")
-        prov = layer.dataProvider()
-        prov.addAttributes([
-            QgsField("id",          QVariant.Int),
-            QgsField("degree",      QVariant.Int),
-            QgsField("betweenness", QVariant.Double),
-            QgsField("area_km2",    QVariant.Double),
-        ])
-        layer.updateFields()
-        for n in self.graph_nodes:
+        for p in polys:
             f = QgsFeature()
-            x, y = n["centroid_xy"]
-            f.setGeometry(QgsGeometry.fromPointXY(QgsPointXY(x, y)))
-            f.setAttributes([
-                n["id"], n["degree"], n["betweenness"], n["area"] / 1e6,
-            ])
+            f.setGeometry(QgsGeometry.fromPolylineXY(p["points"]))
+            f.setAttributes([int(p["traffic"])])
             prov.addFeature(f)
         layer.updateExtents()
-        sym = layer.renderer().symbol()
-        sym.setColor(QColor("#2c3e50"))
-        sym.setSize(3.5)
-        QgsProject.instance().addMapLayer(layer)
+
+        traffics = sorted(int(p["traffic"]) for p in polys)
+        max_t = traffics[-1] if traffics else 1
+        if max_t <= 1:
+            low_hi, med_hi = 1.5, 1.5
+        else:
+            q33 = traffics[len(traffics) // 3]
+            q66 = traffics[(2 * len(traffics)) // 3]
+            low_hi = max(1.5, q33 + 0.5)
+            med_hi = max(low_hi + 0.5, q66 + 0.5)
+
+        def line_sym(color, width):
+            s = QgsSymbol.defaultSymbol(layer.geometryType())
+            s.setColor(QColor(color))
+            s.setWidth(width)
+            return s
+
+        upper = max_t + 0.5
+        ranges = [
+            QgsRendererRange(0.5, low_hi,
+                             line_sym("#95a5a6", 0.4),
+                             "1 path (detour)"),
+            QgsRendererRange(low_hi, med_hi,
+                             line_sym("#e67e22", 1.2),
+                             f"{int(low_hi+0.5)}-{int(med_hi-0.5)} paths"),
+            QgsRendererRange(med_hi, upper,
+                             line_sym("#c0392b", 2.6),
+                             f">= {int(med_hi+0.5)} paths (corridor!)"),
+        ]
+        renderer = QgsGraduatedSymbolRenderer("traffic", ranges)
+        layer.setRenderer(renderer)
+        add_wildboar_layer(layer, ZOrder.LCP_TRAFFIC)
 
     # -----------------------------------------------------------------
+    def _add_forest_anchors_layer(self):
+        """Show the auto-detected forest destinations as labelled dots."""
+        layer = QgsVectorLayer(
+            f"Point?crs={self.crs_wkt}",
+            f"Forest destinations ({len(self.forest_anchors)})",
+            "memory")
+        prov = layer.dataProvider()
+        prov.addAttributes([QgsField("size_cells", QVariant.Int)])
+        layer.updateFields()
+        for (x, y), size in self.forest_anchors:
+            f = QgsFeature()
+            f.setGeometry(QgsGeometry.fromPointXY(QgsPointXY(x, y)))
+            f.setAttributes([int(size)])
+            prov.addFeature(f)
+        layer.updateExtents()
+        sym = layer.renderer().symbol()
+        sym.setColor(QColor("#27ae60"))     # forest green
+        sym.setSize(3.5)
+        add_wildboar_layer(layer, ZOrder.SELECTED_HABITATS)
+
+    # =================================================================
+    # Renderers
+    # =================================================================
     @staticmethod
     def _apply_singleband_ramp(rlayer, ramp_name="Magma"):
         from qgis.core import (
@@ -548,5 +934,30 @@ class HabitatConnectivityTask(QgsTask):
         shader.setRasterShaderFunction(shader_fn)
         renderer = QgsSingleBandPseudoColorRenderer(
             rlayer.dataProvider(), 1, shader)
+        rlayer.setRenderer(renderer)
+        rlayer.triggerRepaint()
+
+    @staticmethod
+    def _apply_risk_ramp(rlayer):
+        from qgis.core import (
+            QgsColorRampShader,
+            QgsGradientColorRamp,
+            QgsGradientStop,
+            QgsRasterShader,
+            QgsSingleBandPseudoColorRenderer,
+        )
+        low_color  = QColor("#2ecc71")
+        mid_color  = QColor("#f1c40f")
+        high_color = QColor("#e74c3c")
+        ramp = QgsGradientColorRamp(low_color, high_color)
+        ramp.setStops([QgsGradientStop(0.5, mid_color)])
+        shader_fn = QgsColorRampShader(
+            0.0, 1.0, ramp, QgsColorRampShader.Interpolated)
+        shader_fn.classifyColorRamp()
+        shader = QgsRasterShader()
+        shader.setRasterShaderFunction(shader_fn)
+        renderer = QgsSingleBandPseudoColorRenderer(
+            rlayer.dataProvider(), 1, shader)
+        renderer.setOpacity(0.75)
         rlayer.setRenderer(renderer)
         rlayer.triggerRepaint()

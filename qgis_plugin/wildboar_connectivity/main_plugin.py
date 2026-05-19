@@ -1,46 +1,27 @@
 # -*- coding: utf-8 -*-
 """
-WildboarConnectivity v2 - main plugin module.
+WildboarConnectivity (ASF) - main plugin module.
 
-Workflow
---------
-1. Pick a resistance raster and the "Kerneinstaende" habitat polygon
-   layer from two dropdowns.
-2. Click ONE point on the map. The click defines the centre of a
-   circular movement neighbourhood whose radius is the configured
-   "wild boar range" (default 7 km; typical home-range radius is 1-4 km,
-   dispersal up to ~10 km, so 7 km is a defensible movement window).
-3. The plugin selects every habitat polygon intersecting that circle
-   and, for every pair of selected habitats, computes:
-       - a least-cost path (Dijkstra, scikit-image)
-       - a contribution to the cumulative Circuitscape current flow
-       - a weighted graph edge (1 / LCP cost) with node centrality
+Habitat-free decision-support tool for African Swine Fever:
 
-Mathematical conversion of resistance to conductance
-----------------------------------------------------
-Each pair of 4-connected cells (i, j) becomes one resistor whose
-resistance is the average of the two cell resistances (each cell
-contributes half the path):
-
-        R_edge(i, j) = 0.5 * (R[i] + R[j])
-        g(i, j)      = 1 / R_edge(i, j)
-
-The weighted graph Laplacian L = D - A (with D the diagonal of incident
-conductances) is solved against b = +1/n_s on source cells and -1/n_s on
-sink cells (the habitat polygons themselves, rasterised onto the grid).
-Edge currents are g_ij * (v_i - v_j); node values are half the sum of
-|edge currents| on incident edges. Summed across all pairs this gives
-the cumulative current map; bright streaks = pinchpoints.
+    1.  Load a resistance raster.
+    2.  Click ONE point on the map. That's the outbreak origin.
+    3.  Draw fences and/or place wildlife overpasses (a working copy of
+        the resistance grid is modified, never the source GeoTIFF).
+    4.  Press Run. The plugin produces:
+            - Pinchpoints / corridors raster (Circuit theory: origin
+              disc as source, AOI boundary as sink) - the ASF spread
+              bottlenecks; bright = best fence target.
+            - Continuous infection-risk raster (green / yellow / red).
+            - Optional: cost-from-origin raster, random walk traces.
+    5.  Tweak fences / overpasses, hit Run again, compare.
 """
 
 import json
 import os
 import sys
 
-# ----------------------------------------------------------------------
-# Windows / QGIS / NumPy stderr workaround. Must run BEFORE numpy is
-# imported anywhere downstream.
-# ----------------------------------------------------------------------
+# Windows / QGIS / NumPy stderr workaround. Must run BEFORE numpy.
 if sys.stderr is None:
     class _DummyStderr:
         def write(self, *a, **kw): pass
@@ -52,7 +33,6 @@ from qgis.core import (
     QgsApplication,
     QgsCoordinateTransform,
     QgsFeature,
-    QgsFeatureRequest,
     QgsField,
     QgsGeometry,
     QgsMapLayerProxyModel,
@@ -61,23 +41,32 @@ from qgis.core import (
     QgsProject,
     QgsRasterLayer,
     QgsVectorLayer,
-    QgsWkbTypes,
 )
 from qgis.PyQt.QtCore import QCoreApplication, QSettings, QTranslator, QVariant
 from qgis.PyQt.QtGui import QColor, QIcon
 from qgis.PyQt.QtWidgets import QAction, QMessageBox
 
 from .connectivity_dialog import WildboarConnectivityDialog
-from .connectivity_task import HabitatConnectivityTask
+from .connectivity_task import AsfConnectivityTask
+from .fence_tool import FenceDrawingTool
+from .layer_utils import (
+    ZOrder,
+    add_wildboar_layer,
+    ensure_google_satellite,
+    remove_all_wildboar_layers,
+)
 from .point_tool import PointSelectionTool
 
 
-LOG_TAG = "wildboar-v2"
+LOG_TAG = "wildboar-asf"
+
+# Generous initial read window around the origin (metres). The task
+# computes the actual AOI from landscape cost, so this number only sets
+# the maximum extent the analysis could ever look at.
+INITIAL_BUFFER_M = 10000.0
+EDGE_BUFFER_M    = 1500.0
 
 
-# =====================================================================
-# Plugin class
-# =====================================================================
 class WildboarConnectivity:
     """QGIS plugin entry point."""
 
@@ -86,7 +75,7 @@ class WildboarConnectivity:
         self.canvas = iface.mapCanvas()
         self.plugin_dir = os.path.dirname(__file__)
 
-        # Standard i18n scaffold (kept for parity with the original).
+        # i18n scaffold.
         locale = (QSettings().value("locale/userLocale") or "en")[0:2]
         qm = os.path.join(self.plugin_dir, "i18n",
                           f"WildboarConnectivity_{locale}.qm")
@@ -96,24 +85,32 @@ class WildboarConnectivity:
             QCoreApplication.installTranslator(self.translator)
 
         self.actions = []
-        self.menu = self.tr("&Wildboar Connectivity v2")
+        self.menu = self.tr("&Wildboar Connectivity (ASF)")
 
-        # Runtime state.
+        # State
         self.dlg = None
-        self.point_tool = None
-        self.center_point_canvas = None   # QgsPointXY in canvas CRS
+        self.origin_tool = None       # PointSelectionTool, role="origin"
+        self.overpass_tool = None     # PointSelectionTool, role="overpass"
+        self.fence_tool = None        # FenceDrawingTool
         self.active_task = None
+
+        self.origin_canvas_point = None   # QgsPointXY in canvas CRS
+        # Fences / overpasses are stored in the canvas CRS and transformed
+        # to the raster CRS just before launching the task.
+        self.fences = []                  # list[QgsGeometry] polyline
+        self.overpasses = []              # list[QgsPointXY]
 
     # -----------------------------------------------------------------
     @staticmethod
-    def tr(message):
-        return QCoreApplication.translate("WildboarConnectivity", message)
+    def tr(msg):
+        return QCoreApplication.translate("WildboarConnectivity", msg)
 
     def initGui(self):
         icon_path = os.path.join(self.plugin_dir, "icon.png")
-        action = QAction(QIcon(icon_path),
-                         self.tr("Habitat connectivity (LCP + pinchpoints + graph)"),
-                         self.iface.mainWindow())
+        action = QAction(
+            QIcon(icon_path),
+            self.tr("ASF connectivity (no habitats needed)"),
+            self.iface.mainWindow())
         action.triggered.connect(self.run)
         self.iface.addToolBarIcon(action)
         self.iface.addPluginToMenu(self.menu, action)
@@ -123,22 +120,43 @@ class WildboarConnectivity:
         for action in self.actions:
             self.iface.removePluginMenu(self.menu, action)
             self.iface.removeToolBarIcon(action)
-        if self.point_tool is not None:
-            self.point_tool.clear_marker()
+        for tool in (self.origin_tool, self.overpass_tool, self.fence_tool):
+            if tool is not None:
+                try:
+                    tool.clear_marker() if hasattr(tool, "clear_marker") \
+                        else tool.reset()
+                except Exception:
+                    pass
+        try:
+            remove_all_wildboar_layers(keep_google=False)
+        except Exception:
+            pass
 
     # -----------------------------------------------------------------
     def run(self):
-        """Open the dialog. Wire signals on first invocation only."""
         if self.dlg is None:
             self.dlg = WildboarConnectivityDialog(self.iface.mainWindow())
             self.dlg.cmbRaster.setFilters(QgsMapLayerProxyModel.RasterLayer)
-            self.dlg.cmbHabitats.setFilters(QgsMapLayerProxyModel.PolygonLayer)
 
-            self.point_tool = PointSelectionTool(
-                self.canvas, role="center", color="#f1c40f")
-            self.point_tool.point_selected.connect(self._on_point_selected)
+            self.origin_tool = PointSelectionTool(
+                self.canvas, role="origin", color="#e74c3c")
+            self.origin_tool.point_selected.connect(self._on_origin_selected)
 
-            self.dlg.btnPick.clicked.connect(self._activate_picker)
+            self.overpass_tool = PointSelectionTool(
+                self.canvas, role="overpass", color="#3498db")
+            self.overpass_tool.point_selected.connect(
+                self._on_overpass_selected)
+
+            self.fence_tool = FenceDrawingTool(self.canvas, color="#e74c3c")
+            self.fence_tool.fence_completed.connect(self._on_fence_drawn)
+
+            self.dlg.btnPickOrigin.clicked.connect(
+                lambda: self._activate_tool("origin"))
+            self.dlg.btnDrawFence.clicked.connect(
+                lambda: self._activate_tool("fence"))
+            self.dlg.btnPlaceOverpass.clicked.connect(
+                lambda: self._activate_tool("overpass"))
+            self.dlg.btnResetMods.clicked.connect(self._on_reset_mods)
             self.dlg.btnRun.clicked.connect(self._on_run_clicked)
 
         self.dlg.show()
@@ -146,228 +164,208 @@ class WildboarConnectivity:
         self.dlg.activateWindow()
 
     # -----------------------------------------------------------------
-    # Centre point picking (any point on the map - not tied to a habitat)
+    # Tool activation
     # -----------------------------------------------------------------
-    def _activate_picker(self):
-        self.dlg.lblStatus.setText(
-            "Click anywhere on the map to set the analysis centre...")
-        self.point_tool.activate_for_role("center")
+    def _activate_tool(self, which):
+        if which == "origin":
+            self.dlg.lblStatus.setText("Click on the map - that is the outbreak origin.")
+            self.origin_tool.activate_for_role("origin")
+        elif which == "fence":
+            self.dlg.lblStatus.setText(
+                "Draw fence: left-click to add vertices, "
+                "right-click or double-click to finish.")
+            self.fence_tool.activate_for_drawing()
+        elif which == "overpass":
+            self.dlg.lblStatus.setText(
+                "Click on the map to place a wildlife overpass.")
+            self.overpass_tool.activate_for_role("overpass")
 
-    def _on_point_selected(self, point, role):
-        self.center_point_canvas = QgsPointXY(point)
-        self.dlg.lblRegion.setText(
-            f"Centre: {point.x():.1f}, {point.y():.1f}")
+    def _on_origin_selected(self, point_canvas, role):
+        self.origin_canvas_point = QgsPointXY(point_canvas)
+        self.dlg.lblOrigin.setText(
+            f"Origin: {point_canvas.x():.1f}, {point_canvas.y():.1f}")
+        self.dlg.lblStatus.setText("Origin captured. Press Run.")
+
+    def _on_fence_drawn(self, geom_canvas):
+        self.fences.append(QgsGeometry(geom_canvas))
+        self._refresh_mods_label()
+        self._refresh_mods_preview_layer()
         self.dlg.lblStatus.setText(
-            "Centre captured. Adjust range and press Run.")
+            "Fence added. Press Run to recompute, or draw another.")
+
+    def _on_overpass_selected(self, point_canvas, role):
+        self.overpasses.append(QgsPointXY(point_canvas))
+        self._refresh_mods_label()
+        self._refresh_mods_preview_layer()
+        self.dlg.lblStatus.setText(
+            "Overpass added. Press Run to recompute, or place another.")
+
+    def _on_reset_mods(self):
+        self.fences = []
+        self.overpasses = []
+        self._refresh_mods_label()
+        self._refresh_mods_preview_layer()
+        self.dlg.lblStatus.setText("Modifications cleared.")
+
+    def _refresh_mods_label(self):
+        self.dlg.lblMods.setText(
+            f"Active: {len(self.fences)} fences, "
+            f"{len(self.overpasses)} overpasses.")
 
     # -----------------------------------------------------------------
-    # Run analysis
+    def _refresh_mods_preview_layer(self):
+        """Live preview of fences and overpasses on the canvas."""
+        raster = self.dlg.cmbRaster.currentLayer()
+        if raster is None:
+            return
+        crs_authid = self.canvas.mapSettings().destinationCrs().authid() \
+                     or "EPSG:2056"
+
+        # Wipe previous previews.
+        proj = QgsProject.instance()
+        for lid, lyr in list(proj.mapLayers().items()):
+            if lyr.name() in ("Fences (active)", "Overpasses (active)"):
+                proj.removeMapLayer(lid)
+
+        if self.fences:
+            lay = QgsVectorLayer(
+                f"LineString?crs={crs_authid}",
+                "Fences (active)", "memory")
+            prov = lay.dataProvider()
+            for g in self.fences:
+                f = QgsFeature()
+                f.setGeometry(g)
+                prov.addFeature(f)
+            lay.updateExtents()
+            sym = lay.renderer().symbol()
+            sym.setColor(QColor("#e74c3c"))
+            sym.setWidth(2.0)
+            add_wildboar_layer(lay, ZOrder.SELECTED_HABITATS - 1)
+
+        if self.overpasses:
+            lay = QgsVectorLayer(
+                f"Point?crs={crs_authid}",
+                "Overpasses (active)", "memory")
+            prov = lay.dataProvider()
+            for p in self.overpasses:
+                f = QgsFeature()
+                f.setGeometry(QgsGeometry.fromPointXY(p))
+                prov.addFeature(f)
+            lay.updateExtents()
+            sym = lay.renderer().symbol()
+            sym.setColor(QColor("#3498db"))
+            sym.setSize(3.5)
+            add_wildboar_layer(lay, ZOrder.SELECTED_HABITATS - 1)
+
+    # -----------------------------------------------------------------
+    # Run
     # -----------------------------------------------------------------
     def _on_run_clicked(self):
         raster = self.dlg.cmbRaster.currentLayer()
-        habitats = self.dlg.cmbHabitats.currentLayer()
 
-        # ---- Input validation -----------------------------------------
         if raster is None or not isinstance(raster, QgsRasterLayer):
             self._warn("Select a resistance raster.")
             return
-        if habitats is None or not isinstance(habitats, QgsVectorLayer):
-            self._warn("Select a habitats polygon layer.")
-            return
-        if habitats.geometryType() != QgsWkbTypes.PolygonGeometry:
-            self._warn("Habitat layer must be polygons.")
-            return
-        if self.center_point_canvas is None:
-            self._warn("Pick a centre point on the map.")
+        if self.origin_canvas_point is None:
+            self._warn("Pick an outbreak point on the map.")
             return
         if not (self.dlg.chkLcp.isChecked()
                 or self.dlg.chkCircuit.isChecked()
-                or self.dlg.chkGraph.isChecked()):
-            self._warn("Enable at least one method.")
-            return
-
-        # ---- Buffer the click point in the habitats CRS ---------------
-        range_m = float(self.dlg.spnRangeKm.value()) * 1000.0
-        habitats_crs = habitats.crs()
-        if habitats_crs.isGeographic():
-            self._warn("Habitats layer is in degrees; reproject to a metric "
-                       "CRS (e.g. EPSG:2056) so the range buffer is in meters.")
+                or self.dlg.chkRisk.isChecked()
+                or self.dlg.chkCost.isChecked()
+                or self.dlg.chkRandomWalk.isChecked()):
+            self._warn("Enable at least one output.")
             return
 
         canvas_crs = self.canvas.mapSettings().destinationCrs()
-        tr_to_habitats = QgsCoordinateTransform(
-            canvas_crs, habitats_crs, QgsProject.instance())
-        center_in_habitats = tr_to_habitats.transform(self.center_point_canvas)
-
-        center_geom = QgsGeometry.fromPointXY(center_in_habitats)
-        # Region = user-defined wild-boar range (drives habitat selection
-        # and the visible output extent).
-        buffer_geom = center_geom.buffer(range_m, 48)
-        # Computation region = region + edge buffer so the circuit solver
-        # has resistance cells outside the area of interest, avoiding the
-        # boundary artefact where current is artificially squeezed
-        # against the window edge. 30 % of the range (min 1.5 km) is
-        # typically enough for the radial 1/r decay to settle.
-        edge_buffer_m = max(range_m * 0.3, 1500.0)
-        compute_buffer_geom = center_geom.buffer(
-            range_m + edge_buffer_m, 48)
-
-        # All habitats whose geometry touches the *visible* region.
-        # Habitats outside the region (but inside the edge buffer) are
-        # NOT sources/sinks - the edge buffer only contributes pure
-        # resistance cells to absorb the boundary effect.
-        req = (QgsFeatureRequest()
-               .setFilterRect(buffer_geom.boundingBox())
-               .setFlags(QgsFeatureRequest.ExactIntersect))
-        in_range = []
-        for f in habitats.getFeatures(req):
-            if f.geometry().intersects(buffer_geom):
-                in_range.append(f)
-
-        if len(in_range) < 2:
-            self._warn(
-                f"Only {len(in_range)} habitat(s) found within "
-                f"{range_m/1000:.0f} km of the centre. Move the point or "
-                f"increase the range.")
-            return
-
-        # ---- Transform geometries into the raster CRS ------------------
         raster_crs = raster.crs()
-        tr_to_raster = QgsCoordinateTransform(
-            habitats_crs, raster_crs, QgsProject.instance())
-
-        # Visible region (in raster CRS): the geojson used to crop the
-        # output pinchpoint raster - so its rendered extent matches the
-        # user-defined circle exactly.
-        buffer_in_raster = QgsGeometry(buffer_geom)
-        buffer_in_raster.transform(tr_to_raster)
-        buffer_geojson = json.loads(buffer_in_raster.asJson())
-
-        # Computation window (in raster CRS): the bigger buffered circle's
-        # bbox. The solver runs on this larger grid; the output is then
-        # cropped/masked back to the user region.
-        compute_in_raster = QgsGeometry(compute_buffer_geom)
-        compute_in_raster.transform(tr_to_raster)
-        bbox_in_raster = compute_in_raster.boundingBox()
-
-        habitats_data = []
-        for f in in_range:
-            g = QgsGeometry(f.geometry())
-            g.transform(tr_to_raster)
-            geojson = json.loads(g.asJson())
-            centroid_pt = g.centroid().asPoint()
-            habitats_data.append({
-                "id":       int(f.id()),
-                "label":    self._describe_feature(habitats, f),
-                "geojson":  geojson,
-                "area":     float(g.area()),
-                "centroid": (float(centroid_pt.x()), float(centroid_pt.y())),
-            })
-            # Habitats touching but partly outside the circle should
-            # still be fully captured by the computational window so
-            # their injection cells are not clipped. The output raster
-            # is masked back to the circle afterwards.
-            bbox_in_raster.combineExtentWith(g.boundingBox())
-
-        if not bbox_in_raster.intersects(raster.extent()):
-            self._warn("Habitats do not overlap the raster extent.")
+        if raster_crs.isGeographic():
+            self._warn("Resistance raster is in degrees - reproject it to "
+                       "a metric CRS (e.g. EPSG:2056).")
             return
 
-        # ---- Visualize buffer + selected habitats on the map -----------
-        if self.dlg.chkShowBuffer.isChecked():
-            self._show_region_preview(
-                center_in_habitats, buffer_geom, habitats_crs, in_range)
+        # ---- Transform the origin into raster CRS --------------------
+        tr_to_raster = QgsCoordinateTransform(
+            canvas_crs, raster_crs, QgsProject.instance())
+        origin_in_raster = tr_to_raster.transform(self.origin_canvas_point)
+        origin_xy = (float(origin_in_raster.x()),
+                     float(origin_in_raster.y()))
 
-        # ---- Launch background task ------------------------------------
-        window_bounds = (bbox_in_raster.xMinimum(),
-                         bbox_in_raster.yMinimum(),
-                         bbox_in_raster.xMaximum(),
-                         bbox_in_raster.yMaximum())
+        # ---- Initial read window: 10 km around origin ----------------
+        ext = raster.extent()
+        min_x = max(ext.xMinimum(),
+                    origin_xy[0] - (INITIAL_BUFFER_M + EDGE_BUFFER_M))
+        max_x = min(ext.xMaximum(),
+                    origin_xy[0] + (INITIAL_BUFFER_M + EDGE_BUFFER_M))
+        min_y = max(ext.yMinimum(),
+                    origin_xy[1] - (INITIAL_BUFFER_M + EDGE_BUFFER_M))
+        max_y = min(ext.yMaximum(),
+                    origin_xy[1] + (INITIAL_BUFFER_M + EDGE_BUFFER_M))
+        if max_x <= min_x or max_y <= min_y:
+            self._warn("Outbreak point is outside the resistance raster.")
+            return
 
-        n_pairs = len(in_range) * (len(in_range) - 1) // 2
+        # ---- Transform fences / overpasses into raster CRS -----------
+        fences_geojson = []
+        for fg in self.fences:
+            gg = QgsGeometry(fg)
+            gg.transform(tr_to_raster)
+            fences_geojson.append(json.loads(gg.asJson()))
+
+        overpasses_xy = []
+        for p in self.overpasses:
+            pp = tr_to_raster.transform(p)
+            overpasses_xy.append((float(pp.x()), float(pp.y())))
+
+        # ---- Clean previous outputs, keep Google satellite -----------
+        remove_all_wildboar_layers(keep_google=True)
+        ensure_google_satellite(opacity=0.3)
+        self._show_origin_preview(origin_in_raster, raster_crs)
+        self._refresh_mods_preview_layer()
+
+        # ---- Launch background task ----------------------------------
+        options = {
+            "lcp":                 self.dlg.chkLcp.isChecked(),
+            "n_lcp_targets":       16,
+            "circuit":             self.dlg.chkCircuit.isChecked(),
+            "use_circuitscape_jl": self.dlg.chkCircuitscapeJl.isChecked(),
+            "risk":                self.dlg.chkRisk.isChecked(),
+            "cost":                self.dlg.chkCost.isChecked(),
+            "random_walk":         self.dlg.chkRandomWalk.isChecked(),
+            "n_walks":             int(self.dlg.spnNWalks.value()),
+        }
         self.dlg.lblStatus.setText(
-            f"Running on {len(in_range)} habitats ({n_pairs} pairs)... "
-            f"watch the Tasks panel.")
+            f"Running... {len(self.fences)} fences, "
+            f"{len(self.overpasses)} overpasses.")
 
-        self.active_task = HabitatConnectivityTask(
+        self.active_task = AsfConnectivityTask(
             raster_path=raster.source(),
-            habitats=habitats_data,
-            window_bounds=window_bounds,
+            origin_xy=origin_xy,
+            origin_radius_cells=2,
+            fences=fences_geojson,
+            overpasses=overpasses_xy,
+            window_bounds=(min_x, min_y, max_x, max_y),
             crs_wkt=raster_crs.toWkt(),
-            run_lcp=self.dlg.chkLcp.isChecked(),
-            run_circuit=self.dlg.chkCircuit.isChecked(),
-            run_graph=self.dlg.chkGraph.isChecked(),
-            region_geojson=buffer_geojson,
+            options=options,
         )
         QgsApplication.taskManager().addTask(self.active_task)
 
     # -----------------------------------------------------------------
-    @staticmethod
-    def _describe_feature(layer, feature):
-        for name_field in ("name", "Name", "NAME",
-                           "bezeichnung", "Bezeichnung",
-                           "id", "ID", "fid"):
-            i = layer.fields().indexOf(name_field)
-            if i >= 0:
-                val = feature.attribute(name_field)
-                if val not in (None, ""):
-                    area_km2 = feature.geometry().area() / 1e6
-                    return f"{name_field}={val} (~{area_km2:.2f} km^2)"
-        area_km2 = feature.geometry().area() / 1e6
-        return f"fid={feature.id()} (~{area_km2:.2f} km^2)"
-
-    # -----------------------------------------------------------------
-    def _show_region_preview(self, center_pt, buffer_geom, crs,
-                             in_range_features):
-        """Add memory layers showing the analysis circle and the
-        habitats it selected."""
+    def _show_origin_preview(self, origin_pt, crs):
+        """Drop a small marker at the outbreak point so the user can see it."""
         authid = crs.authid() or "EPSG:2056"
-
-        # Buffer / range circle.
-        buf = QgsVectorLayer(f"Polygon?crs={authid}",
-                             "Analysis range (buffer)", "memory")
-        prov = buf.dataProvider()
+        lay = QgsVectorLayer(
+            f"Point?crs={authid}", "Outbreak origin", "memory")
+        prov = lay.dataProvider()
         f = QgsFeature()
-        f.setGeometry(buffer_geom)
+        f.setGeometry(QgsGeometry.fromPointXY(origin_pt))
         prov.addFeature(f)
-        buf.updateExtents()
-        sym = buf.renderer().symbol()
-        sym.setColor(QColor(241, 196, 15, 60))   # translucent yellow
-        sym.symbolLayer(0).setStrokeColor(QColor(241, 196, 15))
-        QgsProject.instance().addMapLayer(buf)
+        lay.updateExtents()
+        sym = lay.renderer().symbol()
+        sym.setColor(QColor(231, 76, 60))
+        sym.setSize(5.0)
+        add_wildboar_layer(lay, ZOrder.CENTRE)
 
-        # Centre point marker as a permanent layer (cleaner than just
-        # the on-canvas vertex marker which disappears after a refresh).
-        pt = QgsVectorLayer(f"Point?crs={authid}",
-                            "Analysis centre", "memory")
-        prov = pt.dataProvider()
-        ff = QgsFeature()
-        ff.setGeometry(QgsGeometry.fromPointXY(center_pt))
-        prov.addFeature(ff)
-        pt.updateExtents()
-        sym = pt.renderer().symbol()
-        sym.setColor(QColor(241, 196, 15))
-        sym.setSize(4.0)
-        QgsProject.instance().addMapLayer(pt)
-
-        # Selected habitats highlighted in green.
-        sel = QgsVectorLayer(
-            f"Polygon?crs={authid}",
-            f"Selected habitats ({len(in_range_features)})", "memory")
-        prov = sel.dataProvider()
-        prov.addAttributes([QgsField("id", QVariant.Int)])
-        sel.updateFields()
-        for fe in in_range_features:
-            ff = QgsFeature()
-            ff.setGeometry(fe.geometry())
-            ff.setAttributes([fe.id()])
-            prov.addFeature(ff)
-        sel.updateExtents()
-        sym = sel.renderer().symbol()
-        sym.setColor(QColor(46, 204, 113, 100))  # translucent green
-        QgsProject.instance().addMapLayer(sel)
-
-    # -----------------------------------------------------------------
     def _warn(self, msg):
         self.dlg.lblStatus.setText(msg)
         QgsMessageLog.logMessage(msg, LOG_TAG, Qgis.Warning)

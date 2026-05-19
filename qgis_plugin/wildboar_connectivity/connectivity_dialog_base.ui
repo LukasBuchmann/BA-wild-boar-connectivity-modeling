@@ -3,95 +3,51 @@
  <class>WildboarConnectivityDialogBase</class>
  <widget class="QDialog" name="WildboarConnectivityDialogBase">
   <property name="geometry">
-   <rect>
-    <x>0</x>
-    <y>0</y>
-    <width>490</width>
-    <height>470</height>
-   </rect>
+   <rect><x>0</x><y>0</y><width>520</width><height>560</height></rect>
   </property>
   <property name="windowTitle">
-   <string>Wildboar Connectivity v2</string>
+   <string>Wildboar Connectivity (ASF) v0.5</string>
   </property>
   <layout class="QVBoxLayout" name="verticalLayout">
 
    <item>
     <widget class="QGroupBox" name="grpInputs">
-     <property name="title">
-      <string>1. Inputs</string>
-     </property>
+     <property name="title"><string>1. Input</string></property>
      <layout class="QFormLayout" name="formInputs">
       <item row="0" column="0">
        <widget class="QLabel" name="lblRaster">
-        <property name="text">
-         <string>Resistance raster:</string>
-        </property>
+        <property name="text"><string>Resistance raster:</string></property>
        </widget>
       </item>
       <item row="0" column="1">
        <widget class="QgsMapLayerComboBox" name="cmbRaster"/>
-      </item>
-      <item row="1" column="0">
-       <widget class="QLabel" name="lblHabitats">
-        <property name="text">
-         <string>Core habitats (polygons):</string>
-        </property>
-       </widget>
-      </item>
-      <item row="1" column="1">
-       <widget class="QgsMapLayerComboBox" name="cmbHabitats"/>
       </item>
      </layout>
     </widget>
    </item>
 
    <item>
-    <widget class="QGroupBox" name="grpRegion">
-     <property name="title">
-      <string>2. Pick a center point &amp; movement range</string>
-     </property>
-     <layout class="QGridLayout" name="gridRegion">
+    <widget class="QGroupBox" name="grpOrigin">
+     <property name="title"><string>2. Outbreak point</string></property>
+     <layout class="QGridLayout" name="gridOrigin">
       <item row="0" column="0">
-       <widget class="QPushButton" name="btnPick">
-        <property name="text">
-         <string>Pick center point on map</string>
-        </property>
-       </widget>
-      </item>
-      <item row="0" column="1" colspan="2">
-       <widget class="QLabel" name="lblRegion">
-        <property name="text">
-         <string>&lt;not picked&gt;</string>
-        </property>
-        <property name="wordWrap">
-         <bool>true</bool>
-        </property>
-       </widget>
-      </item>
-      <item row="1" column="0">
-       <widget class="QLabel" name="lblRange">
-        <property name="text">
-         <string>Wild boar range (radius):</string>
-        </property>
-       </widget>
-      </item>
-      <item row="1" column="1">
-       <widget class="QSpinBox" name="spnRangeKm">
-        <property name="minimum"><number>1</number></property>
-        <property name="maximum"><number>20</number></property>
-        <property name="value"><number>7</number></property>
-        <property name="suffix"><string> km</string></property>
+       <widget class="QPushButton" name="btnPickOrigin">
+        <property name="text"><string>Pick outbreak point</string></property>
         <property name="toolTip">
-         <string>Typical wild boar home range radius is 1-4 km; dispersal up to ~10 km. 7 km covers a movement neighbourhood.</string>
+         <string>Click anywhere on the map - that's the location where ASF is introduced. No habitats needed.</string>
         </property>
        </widget>
       </item>
-      <item row="1" column="2">
-       <widget class="QCheckBox" name="chkShowBuffer">
-        <property name="text">
-         <string>Show range on map</string>
-        </property>
-        <property name="checked"><bool>true</bool></property>
+      <item row="0" column="1">
+       <widget class="QLabel" name="lblOrigin">
+        <property name="text"><string>&lt;not picked&gt;</string></property>
+        <property name="wordWrap"><bool>true</bool></property>
+       </widget>
+      </item>
+      <item row="1" column="0" colspan="2">
+       <widget class="QLabel" name="lblAoiNote">
+        <property name="text"><string>Area of interest is computed from landscape cost (no fixed radius, no habitats).</string></property>
+        <property name="styleSheet"><string>color: #666; font-style: italic;</string></property>
        </widget>
       </item>
      </layout>
@@ -100,32 +56,99 @@
 
    <item>
     <widget class="QGroupBox" name="grpMethods">
-     <property name="title">
-      <string>3. Methods</string>
-     </property>
+     <property name="title"><string>3. Outputs</string></property>
      <layout class="QVBoxLayout" name="methodsLayout">
       <item>
-       <widget class="QCheckBox" name="chkLcp">
-        <property name="text">
-         <string>Least-cost paths between all habitat pairs</string>
-        </property>
+       <widget class="QCheckBox" name="chkRisk">
+        <property name="text"><string>Infection risk (continuous: green / yellow / red)</string></property>
         <property name="checked"><bool>true</bool></property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QCheckBox" name="chkLcp">
+        <property name="text"><string>LCP corridors (merged paths to AOI boundary, by traffic)</string></property>
+        <property name="checked"><bool>true</bool></property>
+        <property name="toolTip">
+         <string>For 16 synthetic destinations sampled around the AOI boundary, compute the optimal path. Segments shared by many LCPs become the corridor backbone.</string>
+        </property>
        </widget>
       </item>
       <item>
        <widget class="QCheckBox" name="chkCircuit">
-        <property name="text">
-         <string>Cumulative current flow / pinchpoints (Circuitscape style)</string>
-        </property>
+        <property name="text"><string>Pinchpoints / corridors (current flow - the ASF bottlenecks)</string></property>
         <property name="checked"><bool>true</bool></property>
        </widget>
       </item>
       <item>
-       <widget class="QCheckBox" name="chkGraph">
-        <property name="text">
-         <string>Habitat network graph (centrality, weighted edges)</string>
-        </property>
+       <widget class="QCheckBox" name="chkCircuitscapeJl">
+        <property name="text"><string>    Use official Circuitscape.jl (Julia) if available</string></property>
         <property name="checked"><bool>true</bool></property>
+        <property name="toolTip">
+         <string>If Julia + Circuitscape.jl are installed, use the canonical reference implementation. Falls back to the built-in scipy solver if not.</string>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QCheckBox" name="chkCost">
+        <property name="text"><string>Cost-from-origin raster (boar &quot;distance&quot; surface)</string></property>
+        <property name="checked"><bool>false</bool></property>
+       </widget>
+      </item>
+      <item>
+       <layout class="QHBoxLayout" name="hRandom">
+        <item>
+         <widget class="QCheckBox" name="chkRandomWalk">
+          <property name="text"><string>Random walk traces (N =</string></property>
+          <property name="checked"><bool>false</bool></property>
+         </widget>
+        </item>
+        <item>
+         <widget class="QSpinBox" name="spnNWalks">
+          <property name="minimum"><number>50</number></property>
+          <property name="maximum"><number>2000</number></property>
+          <property name="value"><number>200</number></property>
+          <property name="singleStep"><number>50</number></property>
+         </widget>
+        </item>
+        <item>
+         <widget class="QLabel" name="lblWalksTail">
+          <property name="text"><string>)</string></property>
+         </widget>
+        </item>
+        <item>
+         <spacer><property name="orientation"><enum>Qt::Horizontal</enum></property></spacer>
+        </item>
+       </layout>
+      </item>
+     </layout>
+    </widget>
+   </item>
+
+   <item>
+    <widget class="QGroupBox" name="grpMods">
+     <property name="title"><string>4. Landscape modifications (interactive)</string></property>
+     <layout class="QGridLayout" name="gridMods">
+      <item row="0" column="0">
+       <widget class="QPushButton" name="btnDrawFence">
+        <property name="text"><string>Draw fence</string></property>
+        <property name="toolTip">
+         <string>Left-click to add vertices, right-click or double-click to finish. Esc cancels.</string>
+        </property>
+       </widget>
+      </item>
+      <item row="0" column="1">
+       <widget class="QPushButton" name="btnPlaceOverpass">
+        <property name="text"><string>Place overpass</string></property>
+       </widget>
+      </item>
+      <item row="0" column="2">
+       <widget class="QPushButton" name="btnResetMods">
+        <property name="text"><string>Reset modifications</string></property>
+       </widget>
+      </item>
+      <item row="1" column="0" colspan="3">
+       <widget class="QLabel" name="lblMods">
+        <property name="text"><string>Active: 0 fences, 0 overpasses.</string></property>
        </widget>
       </item>
      </layout>
@@ -134,20 +157,15 @@
 
    <item>
     <widget class="QPushButton" name="btnRun">
-     <property name="text">
-      <string>Run connectivity analysis</string>
-     </property>
+     <property name="text"><string>Run analysis</string></property>
+     <property name="styleSheet"><string>font-weight: bold; padding: 6px;</string></property>
     </widget>
    </item>
 
    <item>
     <widget class="QLabel" name="lblStatus">
-     <property name="text">
-      <string>Idle.</string>
-     </property>
-     <property name="wordWrap">
-      <bool>true</bool>
-     </property>
+     <property name="text"><string>Idle.</string></property>
+     <property name="wordWrap"><bool>true</bool></property>
     </widget>
    </item>
 

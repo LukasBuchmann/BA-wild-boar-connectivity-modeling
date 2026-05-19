@@ -58,7 +58,7 @@ One short re-collaring deployment (`027_Agat_13970`, 50.6 % on-schedule, 32 % sh
 The previous "Rule 1: `sl_ = 0` → in-patch" was redundant — the default already lands such steps as in-patch. The set is now purely about identifying *in-matrix* steps reliably.
 
 | \# | Condition | Label | Source |
-|-----|----------------------------------------|----------------|----------------|
+|--------------|--------------------------------|--------------|--------------|
 | 1 | `sl_ > 250 m` | in-matrix | Podgórski 2013 |
 | 2 | `sl_ > 150 m` AND `|ta_| < π/4` | in-matrix | Clontz 2021 |
 | 3 | ≥ 3 consecutive steps with `sl_ > 100 m` AND `|ta_| < π/4` | in-matrix | Benhamou 2014 |

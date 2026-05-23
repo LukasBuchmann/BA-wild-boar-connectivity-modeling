@@ -1,26 +1,61 @@
 # Material and Methods
-## Forest
+The tool was implemented in two consecutive steps. First, the Resistance Surface was created based on Wild Boar Telemetry data and Spatial Covariantes. This Resistance Surface was then used to build the QGIS Plugin.
+
+## Resistance Surface
+The Resistance Surface is a raster file with a 25 meter resolution which reflects the species willingness and ability to traverse a given spatial unit.
+
+### Dataset
+For Creating the Resistance Surface, the following Datasets were used:
+
+#### Data source and characteristics
+
+
+#### Data Quality and Limitations
+
+
+### Setup
+The entire Resistance Surface creation is conducted in R 4.5.1 with the EPSG:2056 LV95 Coordinate Reference System.
+
+### Movement Metrics and Step Classification
+First, the wild boar telemetry data was loaded from the csv file. The datetime was converted to UTC, the Spatial validity was checked and the first 5 days per animal was dropped due to the capture-shock. One animal id had to be deleted due to very inregular time intervals in the data. At the end all individuals with less than 100 GPS fixes or less than 30 days in the data were dropped.
+
+#### Resampling
+Than, the amt package was used to Resample the tracks to a consistent 15 minutes interval with 5 minutes of tolerance time. Because some of the animals had larger interuptions in the GPS Fixes, the entire movement of each individual was split into bursts. Step lengths (`sl_`) and turning angles (`ta_`) were calculated via `amt::steps_by_burst()`. Steps are computed per burst, so any gap larger than `FIX_RATE_MIN + FIX_TOL_MIN` ends a burst and never produces a spurious long step. All data measures within less than the 15-min intervall were deleted. Animals with sub-15-min burst-pair fixes (e.g. 027_Agat_13969,
+039_Pete_12272) showed retention around 60-70 % - this is **expected deduplication of redundant secondary fixes**, not biological data loss.
+
+#### Step Classification
+The Red Deer Paper (2024_Fischer-etal_Abschlussbericht-Rothirsch-Mittelland) which was used as a template in the whole Resistance Surface pipeline used a specific Fractal analysis with k-means clustering and a Gaussian mixture model. After this was implemented it showed that this solution isn't the right for Wild Boar as Red Deer have more distinct in-patch and in-matrix movement. They stay in a area then make a large seasonal migration and stay in the new area while wild boar always stay in the same area and only migrate if they are searching for another group, doesn't feel safe or landscape changes. To adapt to this different behaviour, a rule based classification was implemented. Because only in-matrix steps are relevant to the resistance surface, three rules were defined that seperate long migratory movement from short in-patch movement, resting, wallowing and foraging. Rule 1 is defined by the step length, if a step is longer than 250 meters, the wild boar is considered to walk long distance to travel to a new area. The second rule is defined by a step length longer than 150 meters and a turning angle of less than pi/4, which reflects a long travel distance in which the wild boar walks nearly straight and is considered to walk into a specific direction in another area. The third rule considers three following steps, if they are all longer than 100 meters and have a low turning angle the wild boar is considered walking over a long time in a straight direction to a new area. All remaining data points are considered to be in-patch movement. The rules where checked with the case_when function. 
+
+### Spatial Covariantes
+After the Step Classification was done, the Study Area was defined and the Spatial Covariantes were loaded and prepared for the iSSF.
+
+#### Study Area
+The Study Area was derived from the tlm_kantonsgebiet layer from the SwissBoundaries dataset. It was filtered to aargau and buffered by 2000 meters. With the function st_as_sfc, the extent was brought to a rectangle. The extent was then cropped to the swiss national boundaries because most of the used datasets are just having data for switzerland. Of course this leads to edge effects in the creation of the resistance surface but the swiss datasets are much more detailed than europeen and the Red Deer study also used swiss data but it is discussed in this section. Than i also created a wkt version of the buffered study area to load the spatial covariantes faster. Also i've created a master grid.
+
+
+
+#### Forest
 Forest availability and structure provide critical refuge, thermal cover, and foraging opportunities for wild boar. Therefore, forest cover and its spatial configuration were derived from the land cover dataset (tlm_bb_bodenbedeckung) within the swissTLM3D database.
 
-### Forest Cover
+##### Forest Cover
 Polygons representing forested areas were filtered based on their object type (objektart == c("Wald", "Wald offen", "Gebueschwald", "Gehoelzflaeche")) and rasterized onto the 25-meter LV95 master grid to create a binary forest mask (1 = forest, 0 = non-forest). During rasterization, a strict inclusion rule was applied to ensure that any pixel touched by a forest polygon was classified as forest. This methodological choice was essential to preserve narrow tree lines, hedgerows, and small copses, which often function as vital movement corridors and stepping-stone habitats for wild boar navigating agricultural landscapes.
 
-### Local Forest Density
+##### Local Forest Density
 Because habitat selection is often driven by the surrounding landscape context rather than a single point, local forest density was calculated. A circular moving window (focal matrix) with a 50-meter radius was applied across the binary forest raster. To ensure mathematical accuracy along study area boundaries, the focal weights were converted into a strict Boolean mask, allowing the model to calculate the exact mean, representing the proportional forest cover (from 0.0 to 1.0), within the immediate vicinity of every pixel. This covariate captures the structural density of the habitat, differentiating between sparse, fragmented tree cover and dense, continuous woodland blocks.
 
-### Distance to Forest Edge
+##### Distance to Forest Edge
 Wild boar exhibit a strong behavioral affinity for ecotones (the transitional boundaries between dense forest cover and open agricultural foraging grounds). To accurately model this behavior, a distance to forest edge covariate was calculated. For pixels in open areas, the Euclidean distance to the nearest forest pixel was calculated. For pixels strictly inside the forest, the Euclidean distance to the nearest open, non-forest pixel was calculated to determine forest depth. These two gradients were then combined into a single, continuous raster layer. Ecologically, this metric allows the spatial model to clearly differentiate between highly attractive forest edge zones, exposed open fields, and deep, isolated forest cores. 
 
 Finally, all forest layers were strictly masked to the clipped study area boundaries to ensure perfect topological alignment with the terrain and hydrological covariates.
 
-## Slope and TRI
+#### Slope and TRI
 Slope (in degrees) and the Terrain Ruggedness Index (TRI) were calculated with terras terrain function and derived using the digital elevation model DHM25 (swisstopo) at a 25-meter resolution. Because the native coordinate reference system of the DHM25 is LV03 (EPSG:21781), the buffered study area bounding box was temporarily transformed into LV03 to crop the raw elevation data, thereby optimizing computational efficiency and reducing memory load.
 
 Slope represents the maximum rate of change in elevation between a focal pixel and its eight surrounding neighbors. This metric quantifies the steepness of the terrain, which is a critical factor determining the energetic cost of movement and the overall physical accessibility of the landscape. To capture local topographic heterogeneity, the Terrain Ruggedness Index (TRI) was calculated. TRI computes the mean of the absolute differences in elevation between a central pixel and its adjacent cells. Ecologically, TRI serves as a quantitative measure of fine-scale surface roughness, it identifies sharp topographic variations, ravines, and highly uneven terrain that may function either as natural physical barriers or as sheltered micro-refugia.
 
 Once the slope and TRI matrices were calculated on the unsmoothed, native-resolution surface, the resulting covariate layers were subsequently reprojected onto the master LV95 (EPSG:2056) study grid using bilinear interpolation. Finally, these topographic layers were masked to the exact, Swiss-clipped study area boundary to ensure perfect spatial alignment and extent matching with the other hydrological and infrastructural datasets.
 
-## Distance to Water
+#### Distance to Water
 To model the distance to water, hydrological features were extracted from the swissTLM3D database (swisstopo). Instead of relying on the general land cover dataset (tlm_bb_bodenbedeckung), the dedicated hydrological layers (tlm_gewaesser_stehendes_gewaesser and tlm_gewaesser_fliessgewaesser) were utilized. The Bodenbedeckung layer aggregates various land cover types, but lacks the semantic depth in hydrological features required for high-resolution ecological modeling. Specifically, it does not provide explicit metadata regarding whether a river flows above ground or in a subterranean pipe, nor does it reliably distinguish fictitious lake axes from physical shorelines. Using the dedicated water layers allowed for precise attribute filtering and topological control necessary to accurately represent physical barriers and resources in the landscape.
 
 Standing water bodies presented significant topological challenges, as the raw geometries were provided as 3-dimensional multilinestrings (LINESTRING Z) with fragmented shoreline segments. To accurately represent these features as solid physical barriers, a custom geometric reconstruction workflow was applied. First, the 3-dimensional Z-coordinates were removed to project all features onto a flat 2-dimensional plane, preventing algorithmic failures caused by minor elevation discrepancies along the shorelines. The dataset was then divided into true lakes (objektart == "See") and islands (objektart == "Seeinsel"). To resolve microscopic topological gaps in the swisstopo data, fragmented line segments were grouped by their unique Water Body ID (gwl_nr) and merged into continuous lines. These lines were then strictly cast into solid polygons, effectively forcing the closure of any remaining geometric gaps. Because islands represent passable terrestrial habitat, they could not be classified as water barriers. Therefore, the island polygons were geometrically subtracted from the primary lake polygons using a Boolean difference operation, resulting in highly accurate, solid lake geometries with intact terrestrial islands.
@@ -29,7 +64,7 @@ Flowing water was heavily filtered to reflect the ecological reality of wild boa
 
 Finally, the highly processed, ecologically accurate vector geometries for both standing and flowing water were rasterized into a binary mask matching the resolution and extent of the master study grid. The Euclidean distance from every pixel to the nearest valid water feature was then calculated, establishing the final dist_water covariate layer for the habitat suitability and resistance models.
 
-## Infrastructure, Highway and Wildlife Passage Layers
+#### Infrastructure, Highway and Wildlife Passage Layers
 The infrastructure component of the resistance surface captures the influence of anthropogenic linear features and built-up areas on wild boar movement. Wild boar exhibit strong but type-dependent avoidance of roads, railways, and settlements, and an accurate representation of these features, including a careful separation of barrier classes and the explicit removal of subsurface infrastructure, is essential for a behaviourally realistic resistance surface. 
 
 All infrastructure layers were derived from the swisstopo SwissTLM3D 2026 vector dataset in the Swiss LV95 / LN02 reference system. Three feature classes were used: tlm_strassen_strasse for the road network, tlm_oev_eisenbahn for railways, and tlm_namen_siedlungsname for settlement polygons. Wildlife crossing structures were extracted from the federal Wildtierpassagen.gdb geodatabase (layer N2023_Version_Wildtierpassagen), and permanent African Swine Fever (ASF) protection fencing was taken from the Cantonal Veterinary Office of Zürich (Dauerzäune.shp). All vector data were loaded with a Well-Known-Text bounding-box filter set to the cantonal extent plus a 2 km quadratic buffer, ensuring that distance calculations near canton boundaries were not biased by edge effects from features just outside the study area.
@@ -55,6 +90,20 @@ For Canton Zürich, an additional Zürich-specific barrier layer was constructed
 
 The five per-class distance rasters enter the pipeline at two distinct stages. First, during iSSF fitting, values are extracted at observed and random step endpoints and z-standardised using the Aargau training mean and standard deviation. The standardised covariates dist_fenced_road_sc, dist_main_road_sc, dist_secondary_road_sc, dist_settlement_sc, and dist_railway_sc are then included as fixed effects in the conditional logistic regression, yielding selection coefficients β that quantify the relative avoidance or preference for each infrastructure type during directed transit movements. Second, during resistance-surface construction, the standardised rasters are combined into the linear predictor η using these β coefficients, transformed into a habitat-suitability raster S ∈ [0, 1] via min–max normalisation, and converted to a resistance raster R via the Keeley exponential transformation R = exp(C × (1 − S)) with C = 4. Finally, absolute-barrier pixels are burned in at R = R_max ≈ 54.6 (motorways, direct infrastructure pixels, ASP fences, and near-open-water at 0.9 × R_max), and wildlife passage pixels are burned in at R = R_min = 1, ensuring that connectivity analyses route freely through these crossings while avoiding impermeable infrastructure.
 This two-tiered design — empirically estimated continuous avoidance gradients from the distance-based covariates, combined with hard-coded absolute barriers from the binary masks — reflects the biological reality that wild boar responses to infrastructure are continuous at intermediate distances but become categorical at the structure itself. It also ensures that wildlife passages, which would otherwise be invisible to the model because they affect connectivity rather than habitat selection, are correctly represented as low-resistance corridors in the final surface used for cantonal-scale connectivity modelling.
+
+### Integrated Step-Selection Function (iSSF)
+
+### Resistance Surface Creation
+
+#### Resistance Surface for Canton Aargau
+
+#### Extrapolation to Canton Zurich
+
+## QGIS Plugin
+
+
+
+
 
 ## Datensatz
 

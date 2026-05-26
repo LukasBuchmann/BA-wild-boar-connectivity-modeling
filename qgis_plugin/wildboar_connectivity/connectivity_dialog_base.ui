@@ -75,50 +75,9 @@
       </item>
       <item>
        <widget class="QCheckBox" name="chkCircuit">
-        <property name="text"><string>Pinchpoints / corridors (current flow - the ASF bottlenecks)</string></property>
+        <property name="text"><string>Pinchpoints / continuous spread (Circuit theory - always uses Circuitscape.jl if available)</string></property>
         <property name="checked"><bool>true</bool></property>
        </widget>
-      </item>
-      <item>
-       <widget class="QCheckBox" name="chkCircuitscapeJl">
-        <property name="text"><string>    Use official Circuitscape.jl (Julia) if available</string></property>
-        <property name="checked"><bool>true</bool></property>
-        <property name="toolTip">
-         <string>If Julia + Circuitscape.jl are installed, use the canonical reference implementation. Falls back to the built-in scipy solver if not.</string>
-        </property>
-       </widget>
-      </item>
-      <item>
-       <widget class="QCheckBox" name="chkCost">
-        <property name="text"><string>Cost-from-origin raster (boar &quot;distance&quot; surface)</string></property>
-        <property name="checked"><bool>false</bool></property>
-       </widget>
-      </item>
-      <item>
-       <layout class="QHBoxLayout" name="hRandom">
-        <item>
-         <widget class="QCheckBox" name="chkRandomWalk">
-          <property name="text"><string>Random walk traces (N =</string></property>
-          <property name="checked"><bool>false</bool></property>
-         </widget>
-        </item>
-        <item>
-         <widget class="QSpinBox" name="spnNWalks">
-          <property name="minimum"><number>50</number></property>
-          <property name="maximum"><number>2000</number></property>
-          <property name="value"><number>200</number></property>
-          <property name="singleStep"><number>50</number></property>
-         </widget>
-        </item>
-        <item>
-         <widget class="QLabel" name="lblWalksTail">
-          <property name="text"><string>)</string></property>
-         </widget>
-        </item>
-        <item>
-         <spacer><property name="orientation"><enum>Qt::Horizontal</enum></property></spacer>
-        </item>
-       </layout>
       </item>
      </layout>
     </widget>

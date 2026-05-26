@@ -271,9 +271,7 @@ class WildboarConnectivity:
             return
         if not (self.dlg.chkLcp.isChecked()
                 or self.dlg.chkCircuit.isChecked()
-                or self.dlg.chkRisk.isChecked()
-                or self.dlg.chkCost.isChecked()
-                or self.dlg.chkRandomWalk.isChecked()):
+                or self.dlg.chkRisk.isChecked()):
             self._warn("Enable at least one output.")
             return
 
@@ -326,13 +324,10 @@ class WildboarConnectivity:
         # ---- Launch background task ----------------------------------
         options = {
             "lcp":                 self.dlg.chkLcp.isChecked(),
-            "n_lcp_targets":       16,
+            "n_lcp_targets":       12,
             "circuit":             self.dlg.chkCircuit.isChecked(),
-            "use_circuitscape_jl": self.dlg.chkCircuitscapeJl.isChecked(),
+            "use_circuitscape_jl": True,   # always, never user-controlled
             "risk":                self.dlg.chkRisk.isChecked(),
-            "cost":                self.dlg.chkCost.isChecked(),
-            "random_walk":         self.dlg.chkRandomWalk.isChecked(),
-            "n_walks":             int(self.dlg.spnNWalks.value()),
         }
         self.dlg.lblStatus.setText(
             f"Running... {len(self.fences)} fences, "

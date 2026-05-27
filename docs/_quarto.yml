@@ -24,7 +24,7 @@ book:
     - 8-anhang-statistik.qmd
 
 bibliography: references.bib
-lang: de                   # controls automatic text (e.g. "Abgabedatum" vs "Submission date")
+lang: en                   # controls automatic text (e.g. "Abgabedatum" vs "Submission date")
 
 institut: "Institut für Umwelt und Natürliche Ressourcen"
 keywords: "Robuste Regression, Ausreisser, Allometrie, Säugetiere, Gehirngrösse, Statistik"
@@ -33,11 +33,11 @@ zhaw-cover-image:
   src: cover.png
   max-width: 100%          # optional, constrains the image on the title page
   max-height: 5cm
-thesis-type: "Projektarbeit 2"
+thesis-type: "Bachelor Thesis"
 degree-type: "Bachelorstudiengang"
-study-year: "2009"
+study-year: "2023"
 submission-date: "2024-12-15"
-study-direction: "Umweltingenieurwesen"
+study-direction: "Applied Digital Life Sciences"
 supervisors:
   - title: "Prof. Dr."
     name: "Max Mustermann"

@@ -105,11 +105,14 @@ def add_wildboar_layer(layer, z):
 
 
 def ensure_google_satellite(opacity: float = 0.3):
-    """Make sure a Google Satellite Hybrid XYZ-tile layer is present.
+    """Make sure a Swissimage WMTS basemap is present in the project.
 
-    If a tagged layer is already in the project, opacity is refreshed
-    and (if its tree node was deleted) re-inserted at the top. Otherwise
-    a fresh layer is created and added.
+    Uses the official swisstopo Swissimage tile service - the standard
+    Swiss orthoimagery, far more appropriate for a Swiss thesis than
+    a Google product. The function name and the tag string
+    `WB_GOOGLE_TAG` are kept for backward compatibility so layers
+    added by older plugin versions are still recognised and reused
+    rather than duplicated.
     """
     project = QgsProject.instance()
     root = project.layerTreeRoot()
@@ -126,16 +129,17 @@ def ensure_google_satellite(opacity: float = 0.3):
                 root.insertLayer(target_idx, layer)
             return layer
 
-    # Build the XYZ-tile URI. The Google URL's own `?` `=` `&` separators
-    # share their grammar with QGIS's URI, so they must be percent-encoded
-    # inside the `url=` value; the `{x}/{y}/{z}` placeholders stay literal.
+    # Swissimage WMTS endpoint (Web Mercator tiles, public, free). The
+    # URL has no query parameters, so no percent-encoding is needed -
+    # the `{z}/{x}/{y}` placeholders are stamped in by QGIS at draw time.
     url_template = (
-        "https://mt1.google.com/vt/"
-        "lyrs%3Dy%26x%3D{x}%26y%3D{y}%26z%3D{z}"
+        "https://wmts.geo.admin.ch/1.0.0/"
+        "ch.swisstopo.swissimage/default/current/3857/"
+        "{z}/{x}/{y}.jpeg"
     )
-    uri = f"type=xyz&url={url_template}&zmax=19&zmin=0"
+    uri = f"type=xyz&url={url_template}&zmax=18&zmin=0"
 
-    layer = QgsRasterLayer(uri, "Google Satellite Hybrid", "wms")
+    layer = QgsRasterLayer(uri, "Swissimage (swisstopo)", "wms")
     if not layer.isValid():
         return None
     layer.setCustomProperty(WB_GOOGLE_TAG, "1")

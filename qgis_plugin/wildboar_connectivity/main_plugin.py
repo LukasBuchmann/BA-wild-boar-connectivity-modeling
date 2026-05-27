@@ -41,6 +41,7 @@ from qgis.core import (
     QgsProject,
     QgsRasterLayer,
     QgsVectorLayer,
+    QgsWkbTypes,
 )
 from qgis.PyQt.QtCore import QCoreApplication, QSettings, QTranslator, QVariant
 from qgis.PyQt.QtGui import QColor, QIcon
@@ -137,6 +138,9 @@ class WildboarConnectivity:
         if self.dlg is None:
             self.dlg = WildboarConnectivityDialog(self.iface.mainWindow())
             self.dlg.cmbRaster.setFilters(QgsMapLayerProxyModel.RasterLayer)
+            # Habitat polygons are optional (LCP destinations override).
+            self.dlg.cmbHabitats.setFilters(QgsMapLayerProxyModel.PolygonLayer)
+            self.dlg.cmbHabitats.setAllowEmptyLayer(True)
 
             self.origin_tool = PointSelectionTool(
                 self.canvas, role="origin", color="#e74c3c")
@@ -271,7 +275,8 @@ class WildboarConnectivity:
             return
         if not (self.dlg.chkLcp.isChecked()
                 or self.dlg.chkCircuit.isChecked()
-                or self.dlg.chkRisk.isChecked()):
+                or self.dlg.chkRisk.isChecked()
+                or self.dlg.chkRandomWalk.isChecked()):
             self._warn("Enable at least one output.")
             return
 
@@ -315,6 +320,12 @@ class WildboarConnectivity:
             pp = tr_to_raster.transform(p)
             overpasses_xy.append((float(pp.x()), float(pp.y())))
 
+        # ---- Optional habitat layer for LCP destinations -------------
+        # When the user picks a polygon layer in the dialog, the LCP
+        # step targets those polygons instead of auto-detecting
+        # low-resistance clusters from the raster.
+        habitats_geojson = self._collect_habitat_polygons(tr_to_raster)
+
         # ---- Clean previous outputs, keep Google satellite -----------
         remove_all_wildboar_layers(keep_google=True)
         ensure_google_satellite(opacity=0.3)
@@ -324,10 +335,14 @@ class WildboarConnectivity:
         # ---- Launch background task ----------------------------------
         options = {
             "lcp":                 self.dlg.chkLcp.isChecked(),
-            "n_lcp_targets":       12,
+            "n_lcp_targets":       100,
             "circuit":             self.dlg.chkCircuit.isChecked(),
             "use_circuitscape_jl": True,   # always, never user-controlled
             "risk":                self.dlg.chkRisk.isChecked(),
+            "random_walk":         self.dlg.chkRandomWalk.isChecked(),
+            "n_walks":             int(self.dlg.spnNWalks.value()),
+            "walk_kappa":          2.0,    # moderate directional persistence
+            "habitats_geojson":    habitats_geojson,
         }
         self.dlg.lblStatus.setText(
             f"Running... {len(self.fences)} fences, "
@@ -360,6 +375,36 @@ class WildboarConnectivity:
         sym.setColor(QColor(231, 76, 60))
         sym.setSize(5.0)
         add_wildboar_layer(lay, ZOrder.CENTRE)
+
+    def _collect_habitat_polygons(self, tr_to_raster):
+        """Read the user-picked habitat layer and return a list of
+        GeoJSON-like polygon dicts in the raster CRS. Returns None if
+        no habitat layer is selected (the task then falls back to its
+        auto-detected clusters).
+        """
+        layer = self.dlg.cmbHabitats.currentLayer()
+        if layer is None or not isinstance(layer, QgsVectorLayer):
+            return None
+        if layer.geometryType() != QgsWkbTypes.PolygonGeometry:
+            return None
+
+        out = []
+        for feat in layer.getFeatures():
+            g = feat.geometry()
+            if g is None or g.isEmpty():
+                continue
+            # Transform a copy into the raster CRS before serialising.
+            gg = QgsGeometry(g)
+            gg.transform(tr_to_raster)
+            try:
+                out.append(json.loads(gg.asJson()))
+            except Exception:
+                continue
+        QgsMessageLog.logMessage(
+            f"Habitats selected: {len(out)} polygons "
+            f"from '{layer.name()}'.",
+            LOG_TAG, Qgis.Info)
+        return out if out else None
 
     def _warn(self, msg):
         self.dlg.lblStatus.setText(msg)

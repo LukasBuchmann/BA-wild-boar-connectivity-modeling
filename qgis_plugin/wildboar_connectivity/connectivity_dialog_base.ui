@@ -22,6 +22,18 @@
       <item row="0" column="1">
        <widget class="QgsMapLayerComboBox" name="cmbRaster"/>
       </item>
+      <item row="1" column="0">
+       <widget class="QLabel" name="lblHabitats">
+        <property name="text"><string>Core habitats (polygons):</string></property>
+       </widget>
+      </item>
+      <item row="1" column="1">
+       <widget class="QgsMapLayerComboBox" name="cmbHabitats">
+        <property name="toolTip">
+         <string>Optional. If set, LCPs target these habitat polygons instead of auto-detected low-resistance clusters.</string>
+        </property>
+       </widget>
+      </item>
      </layout>
     </widget>
    </item>
@@ -78,6 +90,35 @@
         <property name="text"><string>Pinchpoints / continuous spread (Circuit theory - always uses Circuitscape.jl if available)</string></property>
         <property name="checked"><bool>true</bool></property>
        </widget>
+      </item>
+      <item>
+       <layout class="QHBoxLayout" name="hRandom">
+        <item>
+         <widget class="QCheckBox" name="chkRandomWalk">
+          <property name="text"><string>Biased correlated random walk density (n =</string></property>
+          <property name="checked"><bool>false</bool></property>
+          <property name="toolTip">
+           <string>Stochastic BCRW: per-step probability combines a 1/(R*step) cost bias with a von Mises directional-persistence term (Codling et al. 2008; Turchin 1998). The visit-count raster converges to the Circuitscape current map in the limit, but a single run shows individual trajectories.</string>
+          </property>
+         </widget>
+        </item>
+        <item>
+         <widget class="QSpinBox" name="spnNWalks">
+          <property name="minimum"><number>50</number></property>
+          <property name="maximum"><number>5000</number></property>
+          <property name="value"><number>500</number></property>
+          <property name="singleStep"><number>50</number></property>
+         </widget>
+        </item>
+        <item>
+         <widget class="QLabel" name="lblWalksTail">
+          <property name="text"><string>)</string></property>
+         </widget>
+        </item>
+        <item>
+         <spacer><property name="orientation"><enum>Qt::Horizontal</enum></property></spacer>
+        </item>
+       </layout>
       </item>
      </layout>
     </widget>

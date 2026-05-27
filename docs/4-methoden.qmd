@@ -186,7 +186,37 @@ For Canton Zürich, an additional Zürich-specific barrier layer was constructed
 The five per-class distance rasters enter the pipeline at two distinct stages. First, during iSSF fitting, values are extracted at observed and random step endpoints and z-standardised using the Aargau training mean and standard deviation. The standardised covariates dist_fenced_road_sc, dist_main_road_sc, dist_secondary_road_sc, dist_settlement_sc, and dist_railway_sc are then included as fixed effects in the conditional logistic regression, yielding selection coefficients β that quantify the relative avoidance or preference for each infrastructure type during directed transit movements. Second, during resistance-surface construction, the standardised rasters are combined into the linear predictor η using these β coefficients, transformed into a habitat-suitability raster S ∈ [0, 1] via min–max normalisation, and converted to a resistance raster R via the Keeley exponential transformation R = exp(C × (1 − S)) with C = 4. Finally, absolute-barrier pixels are burned in at R = R_max ≈ 54.6 (motorways, direct infrastructure pixels, ASP fences, and near-open-water at 0.9 × R_max), and wildlife passage pixels are burned in at R = R_min = 1, ensuring that connectivity analyses route freely through these crossings while avoiding impermeable infrastructure.
 This two-tiered design — empirically estimated continuous avoidance gradients from the distance-based covariates, combined with hard-coded absolute barriers from the binary masks — reflects the biological reality that wild boar responses to infrastructure are continuous at intermediate distances but become categorical at the structure itself. It also ensures that wildlife passages, which would otherwise be invisible to the model because they affect connectivity rather than habitat selection, are correctly represented as low-resistance corridors in the final surface used for cantonal-scale connectivity modelling.
 
+#### Covariant Stack
+Before fitting the iSSF model, all independent environmental variables were aggregated into a unified covariate stack. This process involved aligning all raster datasets to a common grid, resolution, and extent.
+
 ### Integrated Step-Selection Function (iSSF)
+After all Covariantes were stacked, the integrated Step Selection Function (iSSF) was fitted using the telemetry data. The analysis focused specifically on "in-matrix" steps, representing targeted movement or transit behavior rather than resting or localized foraging.
+
+#### Step Generation and Movement Kernels (eventuell weglassen habe ich schon zuvor gemacht.)
+The telemetry dataset was first filtered to isolate valid in-matrix steps, excluding any entries with missing step lengths or turning angles, as well as stationary points (step length = 0). To contrast the observed steps with available habitat, random control steps were generated for each observed step. This step generation process formed individual strata, pairing each observed case with its respective controls.
+
+To account for the inherent movement characteristics of the species, movement kernel parameters were calculated and included in the model. These consisted of the natural logarithm of the step length ($log(sl + 1)$) to model the step length distribution, and the cosine of the turning angle ($cos(\theta)$) to account for directional persistence during transit.
+
+#### Covariate Extraction and Standardization
+Environmental covariates were extracted at the endpoint of each step (both observed and random). Due to potential inconsistencies in coordinate reference systems (CRS) within the raw telemetry data, the script dynamically verified the native CRS (LV03 or LV95) based on coordinate magnitudes prior to projecting the points to the raster stack's CRS. Steps falling completely outside the covariate raster extents or returning missing values (NA) were excluded from further analysis.
+
+To ensure comparability of effect sizes across variables measured on different scales, all continuous covariates were z-standardized (mean centered and scaled by standard deviation). The mean and standard deviation parameters derived from this training dataset (Canton Aargau) were explicitly saved. This was a critical methodological requirement to ensure that when the model is subsequently projected onto a new spatial extent (Canton Zurich), the target area is scaled using the exact same statistical parameters as the training data.
+
+#### Model Diagnostics and Variable Selection
+Prior to the final model fitting, a rigorous variable selection process was conducted to address multicollinearity and ensure ecological parsimony. A standard logistic regression was temporarily fitted to compute the Variance Inflation Factor (VIF) for all initial covariates. Variables exhibiting critical multicollinearity (VIF > 3) or a lack of statistical significance were iteratively evaluated and removed. 
+
+For example, Slope and the Terrain Ruggedness Index (TRI) exhibited extreme multicollinearity (VIF > 80) due to their inherent mathematical derivation. Both variables were also not significant and were removed from the model. 
+
+Initial models also included a binary forest factor, distance to forest edge, and a focal forest density variable. The binary and distance variables were excluded to resolve redundancy as they didn't added meanigful information besides the focal forest density. The model retained two distinct continuous variables to represent Johnson’s orders of selection: a 50m focal radius (forest_density_sc) to capture micro-canopy cover and immediate security, and a 1000m focal radius (forest_density_g_sc) to represent macro-level forest complexes. VIF analysis confirmed these two scales operated independently without causing collinearity. 
+
+Additionally, standing and flowing water were separated, which led to variance inflation due to spatial overlap. By unifying them into a single variable representing distance to any open water (dist_water), statistical power was significantly increased, resolving the collinearity issue while effectively capturing the generalized barrier effect of open water during transit.
+
+The variable measuring distance to fenced roads was deliberately excluded from the linear predictor. Including impassable fences in an iSSF can lead to a statistical artifact known as the "barrier-trapping effect," where animals pacing along a fence line generate localized GPS clusters that the algorithm misinterprets as active habitat preference. Instead of estimating a coefficient for fences, these features were designated to be burned into the final resistance surface as absolute barriers post hoc.
+
+#### Final Model Fitting
+The refined model utilized a highly parsimonious, VIF-cleared set of covariates (VIF < 1.4 for all remaining variables). The final selection included the movement parameters, the two multi-scale forest density metrics, distance to water, and distances to human infrastructure (main roads, secondary roads, settlements, and railways).
+
+The model was fitted using a conditional logistic regression (survival::clogit in R), stratified by step ID to compare each observed step exclusively against its own paired random controls. The Efron approximation was used to handle any potential tied survival times. The resulting $\beta$-coefficients (log-odds) provided the empirical weighting factors required to construct the final resistance surface for spatial projections.
 
 ### Resistance Surface Creation
 

@@ -58,6 +58,29 @@ from .resistance_editor import apply_modifications
 LOG_TAG = "wildboar-asf"
 
 
+# ---------------------------------------------------------------------
+# Biological calibration of the infection-risk decay kernel.
+#
+# risk(d) = exp(-d / D)  where d is cost-equivalent distance through
+# typical-resistance terrain.
+#
+# D = 4 km, the consensus mean natal dispersal distance for European
+# wild boar across the published telemetry / mark-recapture record:
+#
+#   Truve and Lemel (2003)  Wildlife Biology  9(4): 51 to 57.
+#   Keuling et al. (2010)   Eur J Wildl Res  56(2): 159 to 167.
+#   Prevot and Licoppe (2013) Eur J Wildl Res 59(6): 795 to 803.
+#   Morelle, Lehaire, Lejeune (2015) Mammal Review 45: 15 to 29.
+#
+# The resulting risk bands map to the EFSA operational zones (2018
+# Scientific Opinion on ASF in wild boar):
+#   risk > 0.50 (within ~2.8 km)  -> EFSA protection zone (3 km).
+#   risk 0.15 to 0.50 (~2.8 to ~7.6 km) -> EFSA surveillance zone (10 km).
+#   risk <= 0.15  (> ~7.6 km)     -> outside the surveillance zone.
+# ---------------------------------------------------------------------
+ASF_DISPERSAL_KM = 4.0
+
+
 class AsfConnectivityTask(QgsTask):
     """One-outbreak ASF connectivity analysis - no habitats input."""
 
@@ -80,8 +103,9 @@ class AsfConnectivityTask(QgsTask):
         self.crs_wkt = crs_wkt
         self.options = options
 
-        # Outputs
-        self.cost_raster_path = None
+        # Outputs (each set to the GeoTIFF path when the corresponding
+        # analysis step ran, None otherwise; finished() reads these to
+        # decide which layers to add to the QGIS panel).
         self.risk_raster_path = None
         self.current_raster_path = None
         self.walk_raster_path = None
@@ -101,6 +125,11 @@ class AsfConnectivityTask(QgsTask):
         self.nodata_mask = None
         self.aoi_mask = None
         self._cost_grid = None
+        # Median of the finite resistance cells in the analysis window,
+        # captured in run() right after the read. Used by the risk
+        # kernel to convert ASF_DISPERSAL_KM into a matching cost
+        # (scale = pixels_to_D * R_typ).
+        self.r_typ_for_risk = None
 
     # =================================================================
     # Worker thread
@@ -110,20 +139,45 @@ class AsfConnectivityTask(QgsTask):
             arr, win_tf, crs, rows, cols = self._load_window()
 
             # Bake fences / overpasses into the working resistance grid.
+            # Plugin fences become NaN walls; plugin overpasses become
+            # the minimum resistance value. Both OVERWRITE the underlying
+            # raster, including pre-existing NaN walls from the notebook
+            # (so an overpass on a highway makes that pixel passable).
             if self.fences or self.overpasses:
                 arr = apply_modifications(
                     arr, win_tf, self.fences, self.overpasses,
                     fence_width_cells=2,
                     overpass_radius_cells=2,
                 )
+                # Refresh the NoData mask to reflect the post-modification
+                # state. Fences turn passable cells into NaN walls; an
+                # overpass turns a previously NaN cell into a finite cell.
+                # Every downstream mask and percentile uses this updated
+                # nodata_mask.
+                self.nodata_mask = ~np.isfinite(arr)
                 QgsMessageLog.logMessage(
                     f"Applied {len(self.fences)} fence(s), "
-                    f"{len(self.overpasses)} overpass(es) "
-                    f"to the resistance window.",
+                    f"{len(self.overpasses)} overpass(es). "
+                    f"Wall cells (NaN) after modifications: "
+                    f"{int(self.nodata_mask.sum())}.",
                     LOG_TAG, Qgis.Info)
 
-            # Cubic boar-resistance penalty: high-R pixels become near-walls.
-            arr = self._apply_boar_resistance_penalty(arr)
+            # Typical resistance value (used by the risk-kernel scale
+            # below). Computed from the finite, non-modified cells so
+            # one fence or overpass cannot skew the statistic.
+            valid = ~self.nodata_mask if self.nodata_mask is not None \
+                    else np.isfinite(arr)
+            finite_vals = arr[valid]
+            self.r_typ_for_risk = (float(np.median(finite_vals))
+                                   if finite_vals.size else 1.0)
+            if self.r_typ_for_risk <= 0 \
+                    or not np.isfinite(self.r_typ_for_risk):
+                self.r_typ_for_risk = 1.0
+            QgsMessageLog.logMessage(
+                f"Resistance stats: R_typical = {self.r_typ_for_risk:.2f}, "
+                f"R_max = {float(np.max(finite_vals)) if finite_vals.size else 0:.2f}, "
+                f"impassable cells (NaN walls): {int((~valid).sum())}.",
+                LOG_TAG, Qgis.Info)
 
             # ---- Rasterise the origin as a small disc on the grid ----
             # Pass the resistance array so an impassable click (highway,
@@ -160,11 +214,14 @@ class AsfConnectivityTask(QgsTask):
                 f"({100 * self.aoi_mask.mean():.1f} % of window).",
                 LOG_TAG, Qgis.Info)
 
-            # ---- LCPs to AUTO-DETECTED FOREST destinations -----------
+            # ---- LCPs to the NEAREST low-resistance clusters ---------
+            # Each LCP carries its destination cluster's size as its
+            # strength; shared segments accumulate that strength so the
+            # backbone corridor stands out automatically.
             if self.options.get("lcp", True):
                 self._build_lcps_to_forests(
-                    arr, win_tf, mcp,
-                    n_max_targets=int(self.options.get("n_lcp_targets", 12)))
+                    arr, win_tf, mcp, cost_grid,
+                    n_max_targets=int(self.options.get("n_lcp_targets", 100)))
             self.setProgress(45)
             if self.isCanceled():
                 return False
@@ -209,6 +266,13 @@ class AsfConnectivityTask(QgsTask):
             if self.isCanceled():
                 return False
 
+            # ---- Biased Correlated Random Walk (optional) -----------
+            if self.options.get("random_walk", False):
+                self._random_walks(
+                    arr, win_tf, crs, origin_cells,
+                    n_walks=int(self.options.get("n_walks", 500)),
+                    kappa=float(self.options.get("walk_kappa", 2.0)),
+                )
             self.setProgress(100)
             return True
 
@@ -268,48 +332,42 @@ class AsfConnectivityTask(QgsTask):
         self.nodata_mask = nodata_mask
         return arr, win_tf, crs, arr.shape[0], arr.shape[1]
 
-    def _apply_boar_resistance_penalty(self, arr):
-        """Cubic penalty so wild boar treat high-R pixels as near-walls.
-
-        Impassable cells (NaN) are PRESERVED as NaN throughout, so they
-        remain walls to MCP_Geometric / Circuitscape downstream. The
-        penalty is computed from the median / max of the FINITE cells
-        only - otherwise NaN would contaminate the percentile statistics.
-        """
-        valid = (~self.nodata_mask if self.nodata_mask is not None
-                 else np.isfinite(arr))
-        finite_vals = arr[valid]
-        if finite_vals.size == 0:
-            return arr
-        R_typ = float(np.median(finite_vals))
-        if R_typ <= 0 or not np.isfinite(R_typ):
-            R_typ = 1.0
-        R_max = float(np.max(finite_vals))
-
-        eff = arr * (arr / R_typ) ** 2
-        # Clip ONLY finite cells; leave NaN walls intact.
-        eff_valid = eff[valid]
-        np.clip(eff_valid, 1e-3, 1e9, out=eff_valid)
-        eff[valid] = eff_valid
-        eff[~valid] = np.nan
-
-        n_walls = int((~valid).sum())
-        QgsMessageLog.logMessage(
-            f"Boar penalty: R_typical={R_typ:.2f}, R_max={R_max:.2f}, "
-            f"impassable cells (NaN walls): {n_walls}",
-            LOG_TAG, Qgis.Info)
-        return eff
-
     # -----------------------------------------------------------------
-    # Origin disc rasterisation, with snap-to-passable fallback
+    # Outbreak-zone flood-fill (was: small fixed disc).
+    #
+    # The function still returns the same thing as before: a flat-index
+    # array of source cells. Every downstream caller (scipy Laplacian,
+    # Circuitscape.jl source mask, BCRW starts) then divides the +1 A
+    # injection by len(origin_flat_ids), so each source cell receives
+    # 1/N Amp where N is the size of this set.
+    #
+    # The new logic:
+    #   1. Map the click coordinate to (row, col).
+    #   2. If the click cell is not "low resistance" (R < OUTBREAK_R),
+    #      snap to the nearest cell that is.
+    #   3. Flood-fill the connected component of cells with R < OUTBREAK_R
+    #      containing the snapped click (8-connected, via
+    #      scipy.ndimage.label - the same labelling used elsewhere in
+    #      the plugin for clusters).
+    #   4. Return the flat indices of every cell in that component.
+    #
+    # Spreading the +1 A injection across the whole low-resistance
+    # patch around the click flattens the 1/r radial source artifact
+    # that single-pixel injection produces in 2D Circuitscape (McRae
+    # et al. 2008): each cell now only contributes 1/N to the source,
+    # so no single cell dominates the current field.
     # -----------------------------------------------------------------
+    OUTBREAK_R_THRESHOLD = 5.0   # resistance cutoff for the outbreak zone
+
     def _origin_disc_mask(self, shape, win_tf, arr=None):
-        """Flat-index array of the origin disc, restricted to passable cells.
+        """Flat-index array of the "outbreak zone" source cells.
 
-        If `arr` is provided and the click landed on an impassable (NaN)
-        cell or outside the raster, the origin is snapped to the nearest
-        passable cell. `self.origin_xy` is updated to the snapped point
-        and `self.origin_was_snapped` is set so the UI thread can flag it.
+        Method name kept for back-compatibility with the rest of the
+        plugin; conceptually this is no longer a disc but a flood-fill
+        of contiguous low-resistance pixels (R < OUTBREAK_R_THRESHOLD)
+        around the click. If the click misses such a patch, the origin
+        snaps to the nearest low-resistance cell and
+        self.origin_was_snapped is raised so the UI can flag it.
         """
         rows, cols = shape
         try:
@@ -320,19 +378,30 @@ class AsfConnectivityTask(QgsTask):
         r0 = int(round(r0))
         c0 = int(round(c0))
 
-        in_bounds = (0 <= r0 < rows) and (0 <= c0 < cols)
-        passable_here = (in_bounds and arr is not None
-                         and np.isfinite(arr[r0, c0]))
+        # Without a resistance array there is no flood-fill possible;
+        # return the single click cell as the source. (No production
+        # caller does this; defensive.)
+        if arr is None:
+            if 0 <= r0 < rows and 0 <= c0 < cols:
+                return np.array([r0 * cols + c0], dtype=np.intp)
+            return np.array([], dtype=np.intp)
 
-        # If the click is on a wall (or outside the data), snap.
-        if arr is not None and not passable_here:
-            snap = self._snap_to_passable(arr, r0, c0)
+        # If the click cell isn't a low-resistance cell, snap to the
+        # nearest one before flooding. Both "off the raster" and "on a
+        # NaN wall" and "on a finite but high-R cell" go through here.
+        in_bounds = (0 <= r0 < rows) and (0 <= c0 < cols)
+        low_here = (in_bounds and np.isfinite(arr[r0, c0])
+                    and arr[r0, c0] < self.OUTBREAK_R_THRESHOLD)
+        if not low_here:
+            snap = self._snap_to_low_resistance(
+                arr, r0, c0, self.OUTBREAK_R_THRESHOLD)
             if snap is None:
                 return np.array([], dtype=np.intp)
             r0, c0 = snap
             x_snap, y_snap = rio_xy(win_tf, r0, c0)
             QgsMessageLog.logMessage(
-                "Origin click was on an impassable cell. Snapped: "
+                "Origin click was not on a low-resistance cell. Snapped "
+                f"to nearest R < {self.OUTBREAK_R_THRESHOLD}: "
                 f"({self.origin_xy[0]:.1f}, {self.origin_xy[1]:.1f}) -> "
                 f"({x_snap:.1f}, {y_snap:.1f}).",
                 LOG_TAG, Qgis.Warning)
@@ -342,18 +411,31 @@ class AsfConnectivityTask(QgsTask):
         if not (0 <= r0 < rows and 0 <= c0 < cols):
             return np.array([], dtype=np.intp)
 
-        radius = self.origin_radius_cells
-        cells = []
-        for dr in range(-radius, radius + 1):
-            for dc in range(-radius, radius + 1):
-                if dr * dr + dc * dc > radius * radius:
-                    continue
-                r, c = r0 + dr, c0 + dc
-                if 0 <= r < rows and 0 <= c < cols:
-                    # Skip any wall pixels that sneak into the disc.
-                    if arr is None or np.isfinite(arr[r, c]):
-                        cells.append(r * cols + c)
-        return np.array(cells, dtype=np.intp)
+        # Flood-fill: connected component containing (r0, c0) in the
+        # binary mask of low-resistance, finite-valued cells.
+        try:
+            from scipy.ndimage import label
+        except ImportError:
+            return np.array([r0 * cols + c0], dtype=np.intp)
+
+        zone_mask = np.isfinite(arr) & (arr < self.OUTBREAK_R_THRESHOLD)
+        if not zone_mask[r0, c0]:
+            return np.array([r0 * cols + c0], dtype=np.intp)
+        labeled, _ = label(zone_mask,
+                           structure=np.ones((3, 3), dtype=int))
+        cid = int(labeled[r0, c0])
+        if cid == 0:
+            return np.array([r0 * cols + c0], dtype=np.intp)
+        rr, ccs = np.where(labeled == cid)
+        flat = (rr.astype(np.intp) * cols + ccs.astype(np.intp))
+
+        QgsMessageLog.logMessage(
+            f"Outbreak zone: flood-fill at ({r0}, {c0}) with R < "
+            f"{self.OUTBREAK_R_THRESHOLD} -> {flat.size} source cells "
+            f"(per-cell injection: {1.0 / max(flat.size, 1):.3e} A).",
+            LOG_TAG, Qgis.Info)
+
+        return flat
 
     def _snap_to_passable(self, arr, r0, c0, max_radius_cells=100):
         """Find the (r, c) of the nearest passable cell to (r0, c0).
@@ -364,7 +446,6 @@ class AsfConnectivityTask(QgsTask):
         search window.
         """
         rows, cols = arr.shape
-        # Clamp the search centre into the raster.
         rc = max(0, min(rows - 1, r0))
         cc = max(0, min(cols - 1, c0))
         if np.isfinite(arr[rc, cc]):
@@ -379,7 +460,38 @@ class AsfConnectivityTask(QgsTask):
         if not passable.any():
             return None
         rr, ccs = np.where(passable)
-        # Distance from the (relative) click point.
+        dr = rr - (rc - r1)
+        dc = ccs - (cc - c1)
+        d2 = dr * dr + dc * dc
+        k = int(np.argmin(d2))
+        return (int(rr[k] + r1), int(ccs[k] + c1))
+
+    def _snap_to_low_resistance(self, arr, r0, c0, threshold,
+                                max_radius_cells=100):
+        """Nearest cell with finite resistance BELOW threshold.
+
+        Used by _origin_disc_mask when the user's click landed on a
+        wall (NaN), outside the raster, or on a high-resistance pixel.
+        Same Euclidean-nearest search as _snap_to_passable, with the
+        extra value-filter.
+        """
+        rows, cols = arr.shape
+        rc = max(0, min(rows - 1, r0))
+        cc = max(0, min(cols - 1, c0))
+        if (0 <= r0 < rows) and (0 <= c0 < cols) \
+                and np.isfinite(arr[r0, c0]) \
+                and arr[r0, c0] < threshold:
+            return (r0, c0)
+
+        r1 = max(0, rc - max_radius_cells)
+        r2 = min(rows, rc + max_radius_cells + 1)
+        c1 = max(0, cc - max_radius_cells)
+        c2 = min(cols, cc + max_radius_cells + 1)
+        sub = arr[r1:r2, c1:c2]
+        ok = np.isfinite(sub) & (sub < threshold)
+        if not ok.any():
+            return None
+        rr, ccs = np.where(ok)
         dr = rr - (rc - r1)
         dc = ccs - (cc - c1)
         d2 = dr * dr + dc * dc
@@ -409,22 +521,21 @@ class AsfConnectivityTask(QgsTask):
 
     # -----------------------------------------------------------------
     def _auto_aoi_mask(self, cost_grid, origin_flat_ids, shape):
-        """Cells reachable from origin with cost below an auto threshold.
+        """Every cell reachable from the origin.
 
-        Threshold = 4 x median(finite costs). With the cubic boar penalty
-        applied, this naturally cuts off areas behind barriers without a
-        user-defined radius.
+        The AOI is now just "cost is finite" - i.e. every pixel the
+        origin can reach across the resistance surface, no matter how
+        expensive the route. Cells behind NaN walls (highways, large
+        lakes, fences) get cost == inf and are excluded automatically.
+        Cells with valid resistance that are simply far away stay in
+        the AOI; the risk function exp(-cost/scale) takes care of the
+        "low signal at distance" interpretation by itself, so no extra
+        cost threshold is needed.
         """
         rows, cols = shape
-        finite = cost_grid[np.isfinite(cost_grid)]
-        if finite.size == 0:
-            aoi = np.zeros(shape, dtype=bool)
-        else:
-            median = float(np.median(finite))
-            threshold = max(median * 4.0,
-                            float(np.percentile(finite, 60)) * 1.5)
-            aoi = np.isfinite(cost_grid) & (cost_grid <= threshold)
-        # Always include the origin disc.
+        aoi = np.isfinite(cost_grid)
+        # Always include the origin disc, even if the read-window
+        # padding produced an unusual cost value at it.
         rr, cc = np.unravel_index(origin_flat_ids, (rows, cols))
         aoi[rr, cc] = True
         return aoi
@@ -444,64 +555,120 @@ class AsfConnectivityTask(QgsTask):
         return aoi & (up | down | left | right)
 
     # -----------------------------------------------------------------
-    # LCPs to FOREST destinations (auto-detected from the resistance raster).
+    # Rasterise the user-supplied habitat polygons onto the analysis
+    # grid. Each polygon becomes one labelled cluster (label 1, 2, ...),
+    # so the rest of the LCP step can treat user habitats and
+    # auto-detected clusters identically.
+    # -----------------------------------------------------------------
+    def _rasterize_user_habitats(self, habitats_geojson, win_tf, shape):
+        if not habitats_geojson:
+            return None
+        rows, cols = shape
+        labeled = np.zeros((rows, cols), dtype=np.int32)
+        # Rasterise each polygon individually so we get one label
+        # per habitat (rasterio.features.rasterize on a list with
+        # different values does this in one call).
+        shapes = [(g, i + 1) for i, g in enumerate(habitats_geojson)]
+        labeled = rasterize(
+            shapes,
+            out_shape=shape,
+            transform=win_tf,
+            fill=0,
+            dtype="int32",
+            all_touched=True,
+        )
+        return labeled
+
+    # -----------------------------------------------------------------
+    # LCPs to the NEAREST low-resistance clusters, weighted by cluster
+    # size.
     #
     # Method:
     #   1. Threshold the in-AOI valid cells at the 20th percentile to
-    #      isolate "forest" pixels.
+    #      isolate "low-resistance" pixels (good boar habitat).
     #   2. Find connected components (scipy.ndimage.label, 8-connected).
-    #   3. Skip the patch(es) overlapping the origin disc.
-    #   4. Pick the LARGEST N remaining patches; anchor each by its
-    #      centroid (or nearest in-patch cell if the centroid lies
-    #      outside a concave patch).
-    #   5. Traceback the MCP from each anchor.
-    #   6. Edge traffic = number of LCPs sharing the edge (+1 per LCP).
-    #   7. Merge consecutive edges with equal traffic into single
-    #      line features.
+    #      Cluster SIZE (cell count) is its strength / importance:
+    #      more habitat there means more boars potentially dispersing
+    #      to and from it.
+    #   3. Skip the cluster(s) overlapping the origin disc.
+    #   4. For each remaining cluster, pick the cell with the LOWEST
+    #      Dijkstra cost from the origin as the anchor (the natural
+    #      entry point), and record (entry_cost, anchor_r, anchor_c,
+    #      cluster_size).
+    #   5. Sort by cost ASCENDING (nearest in boar-cost terms first),
+    #      cap at n_max_targets (default 100).
+    #   6. Traceback each anchor through the MCP.
+    #   7. Edge strength: each LCP carries its destination cluster's
+    #      SIZE. For every edge along the path, ADD that size to the
+    #      edge's cumulative strength. Where multiple LCPs share a
+    #      segment, the segment's strength is the SUM of every
+    #      destination it serves - the shared backbone matters more
+    #      because more habitat depends on it.
+    #   8. Merge consecutive edges with the same cumulative strength
+    #      into single line features.
     # -----------------------------------------------------------------
-    def _build_lcps_to_forests(self, arr, win_tf, mcp,
-                               n_max_targets=12,
+    def _build_lcps_to_forests(self, arr, win_tf, mcp, cost_grid,
+                               n_max_targets=100,
                                forest_quantile=0.20,
                                min_patch_cells=5):
-        try:
-            from scipy.ndimage import label
-        except ImportError:
-            QgsMessageLog.logMessage(
-                "scipy.ndimage missing; LCPs skipped.",
-                LOG_TAG, Qgis.Warning)
-            return
-
         rows, cols = arr.shape
 
-        # --- Build the forest mask -----------------------------------
-        in_play = np.ones(arr.shape, dtype=bool)
-        if self.aoi_mask is not None:
-            in_play &= self.aoi_mask
-        if self.nodata_mask is not None:
-            in_play &= ~self.nodata_mask
-        valid_values = arr[in_play]
-        if valid_values.size == 0:
+        # --- Choose the destination source ---------------------------
+        # Path A: user-supplied core-habitat shapefile.
+        # Path B: auto-detected low-resistance clusters (fallback when
+        # no habitat layer is selected in the dialog).
+        user_habitats = self.options.get("habitats_geojson")
+        if user_habitats:
+            labeled = self._rasterize_user_habitats(
+                user_habitats, win_tf, arr.shape)
+            if labeled is None or int(labeled.max()) == 0:
+                QgsMessageLog.logMessage(
+                    "Habitat polygons rasterise to zero cells; "
+                    "LCPs skipped.",
+                    LOG_TAG, Qgis.Warning)
+                return
+            n_features = int(labeled.max())
             QgsMessageLog.logMessage(
-                "No valid in-AOI cells; LCPs skipped.",
-                LOG_TAG, Qgis.Warning)
-            return
-        threshold = float(np.percentile(valid_values,
-                                        100.0 * forest_quantile))
-        forest_mask = (arr <= threshold) & in_play
-
-        if not forest_mask.any():
+                f"LCP target source: user-supplied habitat polygons "
+                f"({n_features} habitats rasterised on the grid).",
+                LOG_TAG, Qgis.Info)
+        else:
+            try:
+                from scipy.ndimage import label
+            except ImportError:
+                QgsMessageLog.logMessage(
+                    "scipy.ndimage missing; LCPs skipped.",
+                    LOG_TAG, Qgis.Warning)
+                return
+            in_play = np.ones(arr.shape, dtype=bool)
+            if self.aoi_mask is not None:
+                in_play &= self.aoi_mask
+            if self.nodata_mask is not None:
+                in_play &= ~self.nodata_mask
+            valid_values = arr[in_play]
+            if valid_values.size == 0:
+                QgsMessageLog.logMessage(
+                    "No valid in-AOI cells; LCPs skipped.",
+                    LOG_TAG, Qgis.Warning)
+                return
+            threshold = float(np.percentile(valid_values,
+                                            100.0 * forest_quantile))
+            forest_mask = (arr <= threshold) & in_play
+            if not forest_mask.any():
+                QgsMessageLog.logMessage(
+                    "No forest pixels under threshold; LCPs skipped.",
+                    LOG_TAG, Qgis.Warning)
+                return
+            labeled, n_features = label(
+                forest_mask, structure=np.ones((3, 3), dtype=int))
+            if n_features == 0:
+                return
             QgsMessageLog.logMessage(
-                "No forest pixels under threshold; LCPs skipped.",
-                LOG_TAG, Qgis.Warning)
-            return
+                f"LCP target source: auto-detected low-resistance "
+                f"clusters ({n_features} clusters).",
+                LOG_TAG, Qgis.Info)
 
-        # --- Connected components (8-connected, like our Dijkstra) ---
-        labeled, n_features = label(forest_mask,
-                                    structure=np.ones((3, 3), dtype=int))
-        if n_features == 0:
-            return
-
-        # --- Identify the patch(es) overlapping the origin disc ------
+        # --- Identify the cluster(s) overlapping the origin disc -----
         origin_ids = self._origin_disc_mask((rows, cols), win_tf, arr=arr)
         origin_patch_ids = set()
         if origin_ids.size:
@@ -509,8 +676,12 @@ class AsfConnectivityTask(QgsTask):
             lab_at_origin = labeled[orr, occ]
             origin_patch_ids = {int(v) for v in lab_at_origin if v > 0}
 
-        # --- Anchor cell per (non-origin) patch ----------------------
-        patches = []   # list of (anchor_row, anchor_col, size)
+        # --- Anchor cell per (non-origin) cluster --------------------
+        # Anchor = the cell in the cluster with the LOWEST Dijkstra
+        # cost from the origin. Conceptually this is the cluster's
+        # "natural entry point" for a dispersing boar, not its
+        # geometric centroid.
+        clusters = []   # list of (entry_cost, anchor_r, anchor_c, size)
         for cid in range(1, n_features + 1):
             if cid in origin_patch_ids:
                 continue
@@ -518,60 +689,68 @@ class AsfConnectivityTask(QgsTask):
             size = rr_p.size
             if size < min_patch_cells:
                 continue
-            cr = int(round(float(rr_p.mean())))
-            cc = int(round(float(cc_p.mean())))
-            if labeled[cr, cc] != cid:
-                # Concave patch: snap centroid to the closest in-patch cell.
-                d2 = (rr_p - cr) ** 2 + (cc_p - cc) ** 2
-                k = int(np.argmin(d2))
-                cr, cc = int(rr_p[k]), int(cc_p[k])
-            patches.append((cr, cc, size))
+            costs = cost_grid[rr_p, cc_p]
+            finite = np.isfinite(costs)
+            if not finite.any():
+                continue
+            k = int(np.argmin(np.where(finite, costs, np.inf)))
+            entry_cost = float(costs[k])
+            if not np.isfinite(entry_cost):
+                continue
+            clusters.append((entry_cost,
+                             int(rr_p[k]), int(cc_p[k]), int(size)))
 
-        if not patches:
+        if not clusters:
             QgsMessageLog.logMessage(
-                "Only the origin's own forest is in the AOI; no LCPs.",
+                "Only the origin's own cluster is in the AOI; no LCPs.",
                 LOG_TAG, Qgis.Info)
             return
 
-        # Largest forests first; cap at n_max_targets.
-        patches.sort(key=lambda p: -p[2])
-        patches = patches[:int(n_max_targets)]
+        # Nearest clusters first (by boar cost-distance), cap at n_max_targets.
+        clusters.sort(key=lambda x: x[0])
+        clusters = clusters[:int(n_max_targets)]
         QgsMessageLog.logMessage(
-            f"LCP forest destinations: {len(patches)} patches "
-            f"(sizes: {[p[2] for p in patches[:5]]}...).",
+            f"LCP destinations: {len(clusters)} nearest low-resistance "
+            f"clusters. First 5 sizes: {[c[3] for c in clusters[:5]]}. "
+            f"First 5 entry costs: {[round(c[0], 1) for c in clusters[:5]]}.",
             LOG_TAG, Qgis.Info)
 
         # Remember anchors for the visualisation layer (in world coords).
         self.forest_anchors = [
-            (rio_xy(win_tf, r, c), size) for (r, c, size) in patches
+            (rio_xy(win_tf, r, c), size)
+            for (_cost, r, c, size) in clusters
         ]
 
-        # --- Traceback each anchor -----------------------------------
-        paths = []
-        for r, c, _size in patches:
+        # --- Traceback each anchor and carry its cluster size --------
+        paths_with_strength = []   # list of (cells, cluster_size)
+        for _cost, r, c, size in clusters:
             try:
                 indices = mcp.traceback((r, c))
             except Exception:
                 continue
             cells = [(int(ri), int(ci)) for ri, ci in indices]
             if len(cells) >= 2:
-                paths.append(cells)
-        self.n_lcps = len(paths)
-        if not paths:
+                paths_with_strength.append((cells, size))
+        self.n_lcps = len(paths_with_strength)
+        if not paths_with_strength:
             return
 
-        # --- Merge into uniform-traffic polylines --------------------
-        # Each shared edge accumulates +1 per LCP that uses it.
+        # --- Cumulative edge strength --------------------------------
+        # Each edge's strength = SUM of destination cluster sizes of
+        # every LCP that traverses it. Shared backbone segments stack
+        # up automatically: a corridor leading to several large
+        # clusters ends up far heavier than a one-cluster detour.
         from collections import defaultdict
-        edge_count = defaultdict(int)
-        for cells in paths:
+        edge_strength = defaultdict(int)
+        for cells, strength in paths_with_strength:
             for a, b in zip(cells, cells[1:]):
                 edge = (a, b) if a < b else (b, a)
-                edge_count[edge] += 1
+                edge_strength[edge] += int(strength)
 
+        # --- Merge into uniform-strength polylines -------------------
         visited = set()
         runs = []
-        for cells in paths:
+        for cells, _strength in paths_with_strength:
             seg_cells = []
             seg_count = None
             for a, b in zip(cells, cells[1:]):
@@ -583,42 +762,53 @@ class AsfConnectivityTask(QgsTask):
                     seg_count = None
                     continue
                 visited.add(edge)
-                c = edge_count[edge]
+                s = edge_strength[edge]
                 if seg_count is None:
                     seg_cells = [a, b]
-                    seg_count = c
-                elif c == seg_count:
+                    seg_count = s
+                elif s == seg_count:
                     seg_cells.append(b)
                 else:
                     runs.append((seg_cells, seg_count))
                     seg_cells = [a, b]
-                    seg_count = c
+                    seg_count = s
             if seg_count is not None and len(seg_cells) >= 2:
                 runs.append((seg_cells, seg_count))
 
-        for cells, count in runs:
+        for cells, strength in runs:
             pts = [QgsPointXY(*rio_xy(win_tf, r, c)) for r, c in cells]
             self.merged_lcp_polylines.append({
                 "points":  pts,
-                "traffic": int(count),
+                "traffic": int(strength),   # field name kept; value =
+                                            # cumulative cluster strength
             })
 
     # =================================================================
     # Output rasters
     # =================================================================
-    def _build_cost_raster(self, cost_grid, win_tf):
-        """Optional: raw cost-from-origin (Dijkstra cost grid)."""
-        return self._mask_crop_write_raster(
-            cost_grid.astype(np.float32), win_tf, prefix="cost")
-
     def _build_risk_raster(self, cost_grid, win_tf):
-        """Continuous infection-risk raster: exp(-cost / median_cost)."""
-        rows, cols = cost_grid.shape
-        in_aoi = cost_grid[self.aoi_mask] if self.aoi_mask is not None else cost_grid
-        finite = in_aoi[np.isfinite(in_aoi)]
-        scale = float(np.median(finite)) if finite.size else 1.0
-        if scale <= 0:
-            scale = 1.0
+        """Continuous infection-risk raster: exp(-cost / D_cost).
+
+        The decay scale D_cost is the cost of traversing ASF_DISPERSAL_KM
+        through typical-resistance terrain. This pins the kernel to the
+        published mean wild boar dispersal distance (4 km, see citations
+        at the top of this module) instead of letting the AOI size
+        stretch the bands outward.
+        """
+        cellsize_m = float(abs(win_tf.a))
+        r_typ = float(self.r_typ_for_risk or 1.0)
+        # Number of pixels to walk to cover ASF_DISPERSAL_KM, and the
+        # approximate cumulative cost along that walk through typical
+        # terrain.
+        n_pixels_D = ASF_DISPERSAL_KM * 1000.0 / cellsize_m
+        scale = max(n_pixels_D * r_typ, 1e-9)
+
+        QgsMessageLog.logMessage(
+            f"Risk kernel: D = {ASF_DISPERSAL_KM:.1f} km, cellsize = "
+            f"{cellsize_m:.0f} m, R_typ = {r_typ:.2f}, cost-scale = "
+            f"{scale:.1f}. risk(d) = exp(-cost / cost-scale).",
+            LOG_TAG, Qgis.Info)
+
         risk = np.exp(-cost_grid / scale)
         risk[~np.isfinite(cost_grid)] = np.nan
         return self._mask_crop_write_raster(
@@ -653,14 +843,11 @@ class AsfConnectivityTask(QgsTask):
             log=_log,
         )
 
-        finite = current[np.isfinite(current) & (current > 0)]
-        floor = max(float(np.percentile(finite, 1)), 1e-12) \
-                if finite.size else 1e-12
-        with np.errstate(divide="ignore", invalid="ignore"):
-            log_curr = np.log10(np.maximum(current, floor))
-        log_curr[~np.isfinite(current)] = np.nan
+        # Save the raw current density (no log transform, no source
+        # mask). The renderer's percentile stretch on the actual data
+        # is the only post-processing applied at visualisation time.
         self.current_raster_path = self._mask_crop_write_raster(
-            log_curr.astype(np.float32), win_tf, prefix="pinchpoints_cs")
+            current.astype(np.float32), win_tf, prefix="pinchpoints_cs")
         return True
 
     def _single_source_current_scipy(self, arr, win_tf, crs, origin_flat_ids):
@@ -726,63 +913,105 @@ class AsfConnectivityTask(QgsTask):
         node_current *= 0.5
         node_current = node_current.reshape(rows, cols).astype(np.float64)
 
-        finite = node_current[node_current > 0]
-        floor = max(float(np.percentile(finite, 1)), 1e-12) \
-                if finite.size else 1e-12
-        with np.errstate(divide="ignore", invalid="ignore"):
-            log_curr = np.log10(np.maximum(node_current, floor))
-        log_curr = log_curr.astype(np.float32)
+        # Save the raw current density (no log transform, no source
+        # mask). The renderer's percentile stretch on the actual data
+        # is the only post-processing applied at visualisation time.
         self.current_raster_path = self._mask_crop_write_raster(
-            log_curr, win_tf, prefix="pinchpoints")
+            node_current.astype(np.float32), win_tf, prefix="pinchpoints")
 
     # -----------------------------------------------------------------
-    # Random walks from the origin disc.
+    # Biased Correlated Random Walk (BCRW) from the origin.
     #
-    # Biological / numerical correctness:
-    #   - 8-connected, but diagonal moves cost sqrt(2) more than
-    #     orthogonal ones. We weight by 1 / (R_neighbour * step_distance)
-    #     so the walker doesn't artificially prefer diagonals.
-    #   - NoData neighbours are excluded outright (a boar never steps
-    #     into a cell with no resistance data).
-    #   - Walk terminates when leaving the AOI - that's the realistic
-    #     boundary of boar dispersal.
-    # The output raster sits on the same pixel grid as the resistance
-    # raster (window_transform preserves alignment), so overlays in QGIS
-    # line up cell-for-cell.
+    # Each step samples one of the 8 neighbours with probability
+    #
+    #     P(neighbour) proportional to   w_cost * w_dir
+    #
+    # where the two factors capture the two well-established
+    # behavioural components of large-mammal movement:
+    #
+    #     w_cost = 1 / (R_neighbour * step_distance)
+    #
+    #         Boars prefer easier terrain and avoid wasting energy
+    #         on longer (diagonal) steps. R_neighbour is the
+    #         post-penalty resistance; step_distance is 1 for
+    #         orthogonal moves and sqrt(2) for diagonals.
+    #
+    #     w_dir  = exp(kappa * cos(theta_step - theta_heading))
+    #
+    #         A von Mises directional-persistence term. After a
+    #         step in direction theta_heading the walker is more
+    #         likely to keep going in roughly the same direction.
+    #         kappa = 0 collapses to an unbiased random walk;
+    #         kappa -> infinity collapses to deterministic
+    #         straight-line motion. We use kappa = 2 (moderate
+    #         persistence; turning-angle SD ~ 50 deg), consistent
+    #         with the cos_ta coefficient from the in-matrix iSSF
+    #         in Step 5 of the resistance-surface notebook.
+    #
+    # References:
+    #     Codling, E. A., Plank, M. J., Benhamou, S. (2008).
+    #         Random walk models in biology. Journal of the Royal
+    #         Society Interface 5(25): 813-834.
+    #     Turchin, P. (1998). Quantitative Analysis of Movement.
+    #         Sinauer.
+    #     Avgar, T., Potts, J. R., Lewis, M. A., Boyce, M. S.
+    #         (2016). Integrated step selection analysis. Methods
+    #         in Ecology and Evolution 7(5): 619-630.
+    #
+    # The output raster is the cell-visit count over n_walks walks.
+    # In the limit n_walks -> infinity it converges to the same
+    # surface as the Circuit-theory current map (Saerens et al.
+    # 2009, RSP framework), which is a useful sanity check.
     # -----------------------------------------------------------------
     def _random_walks(self, arr, win_tf, crs, origin_flat_ids,
-                      n_walks=200, max_steps=2000):
+                      n_walks=500, max_steps=2000, kappa=2.0):
         rows, cols = arr.shape
         rr, cc = np.unravel_index(origin_flat_ids, (rows, cols))
         starts = np.column_stack([rr, cc])
 
-        visit = np.zeros((rows, cols), dtype=np.int32)
+        visit = np.zeros((rows, cols), dtype=np.int64)
         rng = np.random.default_rng()
 
+        # 8-neighbour table: (dr, dc), step distance, step direction
+        # as a unit vector in (dx, dy) raster coords.
         offsets = np.array([
             (-1, -1), (-1, 0), (-1, 1),
             ( 0, -1),          ( 0, 1),
             ( 1, -1), ( 1, 0), ( 1, 1),
         ], dtype=np.intp)
-        # Step distance per offset: orthogonal = 1, diagonal = sqrt(2).
         SQ2 = float(np.sqrt(2.0))
         step_dist = np.array([
             SQ2, 1.0, SQ2,
             1.0,      1.0,
             SQ2, 1.0, SQ2,
         ], dtype=np.float64)
+        # Unit vector pointing from current cell to neighbour cell.
+        # dx is the column delta, dy the row delta (raster row indexes
+        # increase downward, which does not matter for cosine of angle
+        # differences).
+        ux = np.array([-1, 0, 1, -1, 1, -1, 0, 1], dtype=np.float64)
+        uy = np.array([-1,-1,-1,  0, 0,  1, 1, 1], dtype=np.float64)
+        norm = np.sqrt(ux * ux + uy * uy)
+        ux /= norm; uy /= norm
 
         aoi    = self.aoi_mask
         nodata = self.nodata_mask
 
-        for _ in range(n_walks):
+        for _ in range(int(n_walks)):
             if self.isCanceled():
                 return
+
+            # Random start inside the origin disc, random initial heading
+            # (uniform over [0, 2 pi]).
             r, c = starts[rng.integers(0, len(starts))]
             r, c = int(r), int(c)
-            for _ in range(max_steps):
+            theta = float(rng.uniform(0.0, 2.0 * np.pi))
+            hx, hy = float(np.cos(theta)), float(np.sin(theta))
+
+            for _ in range(int(max_steps)):
                 visit[r, c] += 1
-                # Stop once outside the AOI.
+
+                # Stop when the walker leaves the AOI.
                 if aoi is not None and not aoi[r, c]:
                     break
 
@@ -791,7 +1020,7 @@ class AsfConnectivityTask(QgsTask):
                 ok = (nrs >= 0) & (nrs < rows) \
                    & (ncs >= 0) & (ncs < cols)
 
-                # Exclude NoData neighbours (boars don't walk into "no data").
+                # NoData / walls are forbidden moves.
                 if nodata is not None and ok.any():
                     safe_r = np.clip(nrs, 0, rows - 1)
                     safe_c = np.clip(ncs, 0, cols - 1)
@@ -802,19 +1031,40 @@ class AsfConnectivityTask(QgsTask):
 
                 nrs_ok = nrs[ok]
                 ncs_ok = ncs[ok]
-                dists  = step_dist[ok]
-                # Step cost = R_neighbour * step_distance; pick neighbour
-                # with probability inversely proportional to that cost.
-                w = 1.0 / (arr[nrs_ok, ncs_ok] * dists)
-                w /= w.sum()
-                k = rng.choice(len(nrs_ok), p=w)
+                d_ok   = step_dist[ok]
+                ux_ok  = ux[ok]
+                uy_ok  = uy[ok]
+
+                # Cost bias.
+                w_cost = 1.0 / (arr[nrs_ok, ncs_ok] * d_ok)
+
+                # Directional bias: cosine of the angle between the
+                # current heading (hx, hy) and the step direction
+                # (ux, uy), pushed through the von Mises exponential.
+                cos_angle = hx * ux_ok + hy * uy_ok
+                w_dir = np.exp(float(kappa) * cos_angle)
+
+                w = w_cost * w_dir
+                w_sum = w.sum()
+                if not np.isfinite(w_sum) or w_sum <= 0:
+                    break
+                w /= w_sum
+
+                k = int(rng.choice(len(nrs_ok), p=w))
                 r, c = int(nrs_ok[k]), int(ncs_ok[k])
+                # Update the heading to the actual direction taken.
+                hx, hy = float(ux_ok[k]), float(uy_ok[k])
 
         if visit.any():
             grid = visit.astype(np.float32)
             grid[grid == 0] = np.nan
             self.walk_raster_path = self._mask_crop_write_raster(
                 grid, win_tf, prefix="random_walk")
+            QgsMessageLog.logMessage(
+                f"BCRW: {n_walks} walks, max {max_steps} steps each, "
+                f"kappa = {kappa:.1f}. Total cell visits: "
+                f"{int(visit.sum())}.",
+                LOG_TAG, Qgis.Info)
 
     # =================================================================
     # Mask + crop + write helper
@@ -888,7 +1138,7 @@ class AsfConnectivityTask(QgsTask):
         # Pinchpoint raster (the corridor map)
         if self.current_raster_path:
             r = QgsRasterLayer(self.current_raster_path,
-                               "Dispersal corridor probability (Circuit theory, log10)")
+                               "Dispersal corridor probability (Circuit theory, raw current density)")
             if r.isValid():
                 self._apply_singleband_ramp(r, "Magma")
                 add_wildboar_layer(r, ZOrder.PINCHPOINTS)
@@ -901,12 +1151,25 @@ class AsfConnectivityTask(QgsTask):
                 self._apply_risk_ramp(r)
                 add_wildboar_layer(r, ZOrder.SELECTED_HABITATS + 1)
 
+        # Biased Correlated Random Walk density
+        if self.walk_raster_path:
+            n = int(self.options.get("n_walks", 500))
+            r = QgsRasterLayer(
+                self.walk_raster_path,
+                f"Random walk density (BCRW, n = {n})")
+            if r.isValid():
+                self._apply_singleband_ramp(r, "Viridis")
+                # Sits just above the pinchpoint raster so the user can
+                # eyeball BCRW vs Circuitscape - they should agree.
+                add_wildboar_layer(r, ZOrder.PINCHPOINTS - 1)
+
         QgsMessageLog.logMessage(
-            "Done. lcps={l}({s} segments) pinch={p} risk={r}".format(
+            "Done. lcps={l}({s} segments) pinch={p} risk={r} walks={w}".format(
                 l=self.n_lcps,
                 s=len(self.merged_lcp_polylines),
                 p="yes" if self.current_raster_path else "no",
-                r="yes" if self.risk_raster_path else "no"),
+                r="yes" if self.risk_raster_path else "no",
+                w="yes" if self.walk_raster_path else "no"),
             LOG_TAG, Qgis.Success)
 
     # -----------------------------------------------------------------
@@ -932,8 +1195,8 @@ class AsfConnectivityTask(QgsTask):
             return
         layer = QgsVectorLayer(
             f"LineString?crs={self.crs_wkt}",
-            f"Example dispersal trajectories ({len(polys)} segments, "
-            f"{self.n_lcps} target forests) — illustrative",
+            f"Dispersal corridors (LCPs to {self.n_lcps} nearest "
+            f"clusters, weighted by cluster size; {len(polys)} segments)",
             "memory")
         prov = layer.dataProvider()
         prov.addAttributes([QgsField("traffic", QVariant.Int)])
@@ -966,13 +1229,13 @@ class AsfConnectivityTask(QgsTask):
         ranges = [
             QgsRendererRange(0.5, low_hi,
                              line_sym("#85C1E9", 0.6),
-                             "1 path (detour)"),
+                             f"Weak (strength < {int(low_hi)})"),
             QgsRendererRange(low_hi, med_hi,
                              line_sym("#2874A6", 1.6),
-                             f"{int(low_hi+0.5)}-{int(med_hi-0.5)} paths"),
+                             f"Medium ({int(low_hi)}-{int(med_hi)})"),
             QgsRendererRange(med_hi, upper,
                              line_sym("#154360", 3.2),
-                             f">= {int(med_hi+0.5)} paths (corridor!)"),
+                             f"Strong backbone (>= {int(med_hi)})"),
         ]
         renderer = QgsGraduatedSymbolRenderer("traffic", ranges)
         layer.setRenderer(renderer)
@@ -1005,7 +1268,8 @@ class AsfConnectivityTask(QgsTask):
         """Show the auto-detected forest destinations as labelled dots."""
         layer = QgsVectorLayer(
             f"Point?crs={self.crs_wkt}",
-            f"Forest destinations ({len(self.forest_anchors)})",
+            f"Cluster destinations ({len(self.forest_anchors)} "
+            f"nearest low-resistance clusters)",
             "memory")
         prov = layer.dataProvider()
         prov.addAttributes([QgsField("size_cells", QVariant.Int)])

@@ -21,10 +21,23 @@ from rasterio.features import rasterize
 
 
 # Resistance values used for the modifications.
-# 1e6 matches the NoData substitute in connectivity_task._load_window
-# so a fence is, effectively, "as impassable as missing data".
-FENCE_RESISTANCE    = 1e6
-OVERPASS_RESISTANCE = 1.0     # near the floor we clip to (1e-3); easy walk
+#
+# A plugin-drawn fence is treated as a TRUE WALL: the cells in the
+# fence ribbon become NaN, which propagates through Dijkstra (NaN
+# becomes np.inf at the MCP step), Circuitscape, and the output
+# masking, so the LCP and current-flow code cannot cross. NaN
+# OVERWRITES any underlying resistance value, including pre-existing
+# NaN walls from the notebook (highways, large lakes, ASP fences).
+#
+# A plugin-placed overpass is treated as the EASIEST POSSIBLE WALK:
+# its disc gets a very low finite resistance, again OVERWRITING any
+# underlying value. This lets the user punch a passable corridor
+# through a highway / lake / fence by simply placing an overpass on
+# it - exactly what a real wildlife crossing does in the landscape.
+import numpy as _np
+
+FENCE_RESISTANCE    = _np.nan
+OVERPASS_RESISTANCE = 1e-3    # equals the lower clip floor used downstream
 
 
 def apply_modifications(

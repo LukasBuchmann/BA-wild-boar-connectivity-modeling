@@ -80,6 +80,118 @@ LOG_TAG = "wildboar-asf"
 # ---------------------------------------------------------------------
 ASF_DISPERSAL_KM = 4.0
 
+# =================================================================
+# iSSF-IBMM parameters
+# Movement kernel fitted to WildBoar_InMatrix_Steps.csv (15-min GPS,
+# in-matrix dispersal state). Gamma(2.5, 160 m) → mean 400 m/step.
+# =================================================================
+IBMM_SL_GAMMA_SHAPE    = 2.5    # step-length shape
+IBMM_SL_GAMMA_SCALE_M  = 160.0  # step-length scale (metres)
+IBMM_KAPPA             = 0.5    # von Mises concentration → SD ≈ 85°
+IBMM_N_CANDIDATES      = 25     # candidate endpoints per step
+
+# ASF infectious period: Gamma(3, 3.5 d) → mean 10.5 d (EFSA 2018)
+ASF_IP_GAMMA_SHAPE       = 3.0
+ASF_IP_GAMMA_SCALE_DAYS  = 3.5
+ASF_ACTIVE_STEPS_PER_DAY = 20   # active dispersal steps per day
+IBMM_MAX_STEPS_CAP       = 3000 # hard per-agent cap
+
+
+def simulate_ibmm(
+    hab_suitability: np.ndarray,
+    nodata_mask,
+    source_cells: np.ndarray,
+    win_tf,
+    aoi_mask,
+    n_agents: int = 2000,
+    rng=None,
+    cancel_check=None,
+) -> np.ndarray:
+    """Simulate n_agents infected wild-boar trajectories; return contamination-
+    probability raster (visits / n_agents per cell, float32).
+
+    Each agent starts at a random cell in source_cells, lives for a
+    stochastic number of steps drawn from the ASF infectious-period
+    distribution, and selects the next cell from IBMM_N_CANDIDATES
+    candidates proportionally to hab_suitability at each endpoint.
+    """
+    if rng is None:
+        rng = np.random.default_rng()
+
+    rows, cols = hab_suitability.shape
+    cellsize_m  = float(abs(win_tf.a))
+    sl_scale_px = IBMM_SL_GAMMA_SCALE_M / cellsize_m
+
+    hs = hab_suitability.astype(np.float64, copy=True)
+    hs[~np.isfinite(hs)] = 0.0
+    hs[hs < 0.0] = 0.0
+    if nodata_mask is not None:
+        hs[nodata_mask] = 0.0
+
+    visit = np.zeros((rows, cols), dtype=np.float64)
+    orr, occ = np.unravel_index(source_cells, (rows, cols))
+    n_starts = len(orr)
+
+    for agent_idx in range(n_agents):
+        if cancel_check is not None and agent_idx % 100 == 0:
+            if cancel_check():
+                break
+
+        life_days   = rng.gamma(ASF_IP_GAMMA_SHAPE, ASF_IP_GAMMA_SCALE_DAYS)
+        agent_steps = min(
+            int(round(life_days * ASF_ACTIVE_STEPS_PER_DAY)),
+            IBMM_MAX_STEPS_CAP,
+        )
+        if agent_steps < 1:
+            agent_steps = 1
+
+        k0 = int(rng.integers(0, n_starts))
+        r, c = int(orr[k0]), int(occ[k0])
+        heading = float(rng.uniform(0.0, 2.0 * np.pi))
+
+        for _ in range(agent_steps):
+            if aoi_mask is not None and not aoi_mask[r, c]:
+                break
+
+            visit[r, c] += 1.0
+
+            sls  = rng.gamma(IBMM_SL_GAMMA_SHAPE, sl_scale_px,
+                             size=IBMM_N_CANDIDATES)
+            tas  = rng.vonmises(0.0, IBMM_KAPPA, size=IBMM_N_CANDIDATES)
+            dirs = heading + tas
+
+            nc   = c + sls * np.cos(dirs)
+            nr   = r - sls * np.sin(dirs)
+            nc_i = np.round(nc).astype(np.intp)
+            nr_i = np.round(nr).astype(np.intp)
+
+            valid = ((nr_i >= 0) & (nr_i < rows) &
+                     (nc_i >= 0) & (nc_i < cols))
+            if not valid.any():
+                break
+
+            nr_safe = np.where(valid, nr_i, 0).astype(np.intp)
+            nc_safe = np.where(valid, nc_i, 0).astype(np.intp)
+            w = np.where(valid, hs[nr_safe, nc_safe], 0.0)
+
+            wsum = float(w.sum())
+            if wsum <= 0.0:
+                break
+
+            w /= wsum
+            k = int(rng.choice(IBMM_N_CANDIDATES, p=w))
+            if not valid[k]:
+                break
+
+            heading = float(np.arctan2(
+                -(float(nr_i[k]) - r),
+                float(nc_i[k]) - c,
+            ))
+            r, c = int(nr_i[k]), int(nc_i[k])
+
+    prob = visit / max(n_agents, 1)
+    return prob.astype(np.float32)
+
 
 class AsfConnectivityTask(QgsTask):
     """One-outbreak ASF connectivity analysis - no habitats input."""
@@ -109,26 +221,18 @@ class AsfConnectivityTask(QgsTask):
         self.risk_raster_path = None
         self.current_raster_path = None
         self.walk_raster_path = None
+        self.ibmm_raster_path = None
         self.merged_lcp_polylines = []   # list[{"points", "traffic"}]
         self.forest_anchors = []         # list[((x, y), size)] - LCP targets
         self.n_lcps = 0                  # number of synthetic LCPs computed
         self.exception = None
 
-        # Origin-snap tracking: if the user's click landed on an
-        # impassable (NaN) cell, _origin_disc_mask snaps it to the
-        # nearest passable cell and records the original + final
-        # coordinates so the UI can show both.
-        self.origin_was_snapped = False
-        self.original_origin_xy = tuple(self.origin_xy)
-
         # Internal state
         self.nodata_mask = None
         self.aoi_mask = None
         self._cost_grid = None
-        # Median of the finite resistance cells in the analysis window,
-        # captured in run() right after the read. Used by the risk
-        # kernel to convert ASF_DISPERSAL_KM into a matching cost
-        # (scale = pixels_to_D * R_typ).
+        # Median resistance in the analysis window — used by the risk
+        # kernel to convert ASF_DISPERSAL_KM into a matching cost scale.
         self.r_typ_for_risk = None
 
     # =================================================================
@@ -162,9 +266,7 @@ class AsfConnectivityTask(QgsTask):
                     f"{int(self.nodata_mask.sum())}.",
                     LOG_TAG, Qgis.Info)
 
-            # Typical resistance value (used by the risk-kernel scale
-            # below). Computed from the finite, non-modified cells so
-            # one fence or overpass cannot skew the statistic.
+            # Typical resistance value for the risk-kernel scale.
             valid = ~self.nodata_mask if self.nodata_mask is not None \
                     else np.isfinite(arr)
             finite_vals = arr[valid]
@@ -179,18 +281,16 @@ class AsfConnectivityTask(QgsTask):
                 f"impassable cells (NaN walls): {int((~valid).sum())}.",
                 LOG_TAG, Qgis.Info)
 
-            # ---- Rasterise the origin as a small disc on the grid ----
-            # Pass the resistance array so an impassable click (highway,
-            # lake, fence) snaps to the nearest passable cell instead of
-            # failing.
-            origin_cells = self._origin_disc_mask(arr.shape, win_tf, arr=arr)
-            if origin_cells.size == 0:
+            # ---- Source disc at the outbreak pixel -------------------
+            # Snaps to nearest passable cell when click lands on a wall.
+            source_cells = self._point_source_cells(arr.shape, win_tf, arr=arr)
+            if source_cells.size == 0:
                 raise RuntimeError(
                     "No passable cells within ~2.5 km of the outbreak click. "
                     "Pick a point on land that is not entirely surrounded by "
                     "highways, large lakes, or fences.")
             QgsMessageLog.logMessage(
-                f"Origin disc: {origin_cells.size} cell(s) at "
+                f"Source disc: {source_cells.size} cell(s) at "
                 f"({self.origin_xy[0]:.1f}, {self.origin_xy[1]:.1f}); "
                 f"window {rows}x{cols}.",
                 LOG_TAG, Qgis.Info)
@@ -199,15 +299,15 @@ class AsfConnectivityTask(QgsTask):
             if self.isCanceled():
                 return False
 
-            # ---- Single Dijkstra from origin -------------------------
-            cost_grid, mcp = self._single_source_dijkstra(arr, origin_cells)
+            # ---- Single Dijkstra from outbreak point ----------------
+            cost_grid, mcp = self._single_source_dijkstra(arr, source_cells)
             self._cost_grid = cost_grid
             self.setProgress(25)
             if self.isCanceled():
                 return False
 
             # ---- Auto AOI from the cost grid -------------------------
-            self.aoi_mask = self._auto_aoi_mask(cost_grid, origin_cells,
+            self.aoi_mask = self._auto_aoi_mask(cost_grid, source_cells,
                                                 arr.shape)
             QgsMessageLog.logMessage(
                 f"AOI: {int(self.aoi_mask.sum())} cells "
@@ -241,8 +341,7 @@ class AsfConnectivityTask(QgsTask):
                         and is_julia_available() \
                         and is_circuitscape_installed():
                     try:
-                        used_jl = self._try_circuitscape_jl(
-                            arr, win_tf, origin_cells)
+                        used_jl = self._try_circuitscape_jl(arr, win_tf)
                         if used_jl:
                             QgsMessageLog.logMessage(
                                 "Pinchpoints computed via Circuitscape.jl.",
@@ -260,8 +359,7 @@ class AsfConnectivityTask(QgsTask):
                             LOG_TAG, Qgis.Warning)
                         used_jl = False
                 if not used_jl:
-                    self._single_source_current_scipy(
-                        arr, win_tf, crs, origin_cells)
+                    self._single_source_current_scipy(arr, win_tf, crs)
             self.setProgress(80)
             if self.isCanceled():
                 return False
@@ -269,10 +367,17 @@ class AsfConnectivityTask(QgsTask):
             # ---- Biased Correlated Random Walk (optional) -----------
             if self.options.get("random_walk", False):
                 self._random_walks(
-                    arr, win_tf, crs, origin_cells,
+                    arr, win_tf, crs, source_cells,
                     n_walks=int(self.options.get("n_walks", 500)),
                     kappa=float(self.options.get("walk_kappa", 2.0)),
                 )
+            self.setProgress(90)
+            if self.isCanceled():
+                return False
+
+            # ---- iSSF-IBMM agent simulation (optional) --------------
+            if self.options.get("ibmm", False):
+                self._run_ibmm(arr, win_tf, source_cells)
             self.setProgress(100)
             return True
 
@@ -332,111 +437,6 @@ class AsfConnectivityTask(QgsTask):
         self.nodata_mask = nodata_mask
         return arr, win_tf, crs, arr.shape[0], arr.shape[1]
 
-    # -----------------------------------------------------------------
-    # Outbreak-zone flood-fill (was: small fixed disc).
-    #
-    # The function still returns the same thing as before: a flat-index
-    # array of source cells. Every downstream caller (scipy Laplacian,
-    # Circuitscape.jl source mask, BCRW starts) then divides the +1 A
-    # injection by len(origin_flat_ids), so each source cell receives
-    # 1/N Amp where N is the size of this set.
-    #
-    # The new logic:
-    #   1. Map the click coordinate to (row, col).
-    #   2. If the click cell is not "low resistance" (R < OUTBREAK_R),
-    #      snap to the nearest cell that is.
-    #   3. Flood-fill the connected component of cells with R < OUTBREAK_R
-    #      containing the snapped click (8-connected, via
-    #      scipy.ndimage.label - the same labelling used elsewhere in
-    #      the plugin for clusters).
-    #   4. Return the flat indices of every cell in that component.
-    #
-    # Spreading the +1 A injection across the whole low-resistance
-    # patch around the click flattens the 1/r radial source artifact
-    # that single-pixel injection produces in 2D Circuitscape (McRae
-    # et al. 2008): each cell now only contributes 1/N to the source,
-    # so no single cell dominates the current field.
-    # -----------------------------------------------------------------
-    OUTBREAK_R_THRESHOLD = 5.0   # resistance cutoff for the outbreak zone
-
-    def _origin_disc_mask(self, shape, win_tf, arr=None):
-        """Flat-index array of the "outbreak zone" source cells.
-
-        Method name kept for back-compatibility with the rest of the
-        plugin; conceptually this is no longer a disc but a flood-fill
-        of contiguous low-resistance pixels (R < OUTBREAK_R_THRESHOLD)
-        around the click. If the click misses such a patch, the origin
-        snaps to the nearest low-resistance cell and
-        self.origin_was_snapped is raised so the UI can flag it.
-        """
-        rows, cols = shape
-        try:
-            inv = ~win_tf
-        except Exception:
-            return np.array([], dtype=np.intp)
-        c0, r0 = inv * self.origin_xy
-        r0 = int(round(r0))
-        c0 = int(round(c0))
-
-        # Without a resistance array there is no flood-fill possible;
-        # return the single click cell as the source. (No production
-        # caller does this; defensive.)
-        if arr is None:
-            if 0 <= r0 < rows and 0 <= c0 < cols:
-                return np.array([r0 * cols + c0], dtype=np.intp)
-            return np.array([], dtype=np.intp)
-
-        # If the click cell isn't a low-resistance cell, snap to the
-        # nearest one before flooding. Both "off the raster" and "on a
-        # NaN wall" and "on a finite but high-R cell" go through here.
-        in_bounds = (0 <= r0 < rows) and (0 <= c0 < cols)
-        low_here = (in_bounds and np.isfinite(arr[r0, c0])
-                    and arr[r0, c0] < self.OUTBREAK_R_THRESHOLD)
-        if not low_here:
-            snap = self._snap_to_low_resistance(
-                arr, r0, c0, self.OUTBREAK_R_THRESHOLD)
-            if snap is None:
-                return np.array([], dtype=np.intp)
-            r0, c0 = snap
-            x_snap, y_snap = rio_xy(win_tf, r0, c0)
-            QgsMessageLog.logMessage(
-                "Origin click was not on a low-resistance cell. Snapped "
-                f"to nearest R < {self.OUTBREAK_R_THRESHOLD}: "
-                f"({self.origin_xy[0]:.1f}, {self.origin_xy[1]:.1f}) -> "
-                f"({x_snap:.1f}, {y_snap:.1f}).",
-                LOG_TAG, Qgis.Warning)
-            self.origin_xy = (float(x_snap), float(y_snap))
-            self.origin_was_snapped = True
-
-        if not (0 <= r0 < rows and 0 <= c0 < cols):
-            return np.array([], dtype=np.intp)
-
-        # Flood-fill: connected component containing (r0, c0) in the
-        # binary mask of low-resistance, finite-valued cells.
-        try:
-            from scipy.ndimage import label
-        except ImportError:
-            return np.array([r0 * cols + c0], dtype=np.intp)
-
-        zone_mask = np.isfinite(arr) & (arr < self.OUTBREAK_R_THRESHOLD)
-        if not zone_mask[r0, c0]:
-            return np.array([r0 * cols + c0], dtype=np.intp)
-        labeled, _ = label(zone_mask,
-                           structure=np.ones((3, 3), dtype=int))
-        cid = int(labeled[r0, c0])
-        if cid == 0:
-            return np.array([r0 * cols + c0], dtype=np.intp)
-        rr, ccs = np.where(labeled == cid)
-        flat = (rr.astype(np.intp) * cols + ccs.astype(np.intp))
-
-        QgsMessageLog.logMessage(
-            f"Outbreak zone: flood-fill at ({r0}, {c0}) with R < "
-            f"{self.OUTBREAK_R_THRESHOLD} -> {flat.size} source cells "
-            f"(per-cell injection: {1.0 / max(flat.size, 1):.3e} A).",
-            LOG_TAG, Qgis.Info)
-
-        return flat
-
     def _snap_to_passable(self, arr, r0, c0, max_radius_cells=100):
         """Find the (r, c) of the nearest passable cell to (r0, c0).
 
@@ -466,52 +466,17 @@ class AsfConnectivityTask(QgsTask):
         k = int(np.argmin(d2))
         return (int(rr[k] + r1), int(ccs[k] + c1))
 
-    def _snap_to_low_resistance(self, arr, r0, c0, threshold,
-                                max_radius_cells=100):
-        """Nearest cell with finite resistance BELOW threshold.
-
-        Used by _origin_disc_mask when the user's click landed on a
-        wall (NaN), outside the raster, or on a high-resistance pixel.
-        Same Euclidean-nearest search as _snap_to_passable, with the
-        extra value-filter.
-        """
-        rows, cols = arr.shape
-        rc = max(0, min(rows - 1, r0))
-        cc = max(0, min(cols - 1, c0))
-        if (0 <= r0 < rows) and (0 <= c0 < cols) \
-                and np.isfinite(arr[r0, c0]) \
-                and arr[r0, c0] < threshold:
-            return (r0, c0)
-
-        r1 = max(0, rc - max_radius_cells)
-        r2 = min(rows, rc + max_radius_cells + 1)
-        c1 = max(0, cc - max_radius_cells)
-        c2 = min(cols, cc + max_radius_cells + 1)
-        sub = arr[r1:r2, c1:c2]
-        ok = np.isfinite(sub) & (sub < threshold)
-        if not ok.any():
-            return None
-        rr, ccs = np.where(ok)
-        dr = rr - (rc - r1)
-        dc = ccs - (cc - c1)
-        d2 = dr * dr + dc * dc
-        k = int(np.argmin(d2))
-        return (int(rr[k] + r1), int(ccs[k] + c1))
-
     # -----------------------------------------------------------------
-    def _single_source_dijkstra(self, arr, origin_flat_ids):
-        """One Dijkstra sweep from the origin disc through the whole grid.
+    def _single_source_dijkstra(self, arr, source_cells):
+        """One Dijkstra sweep from the source disc through the whole grid.
 
-        IMPORTANT: skimage.graph.MCP_Geometric is implemented in C and
-        causes an access-violation crash when the cost array contains
-        NaN. It DOES handle np.inf correctly (treats those cells as
-        impassable, just like NaN was supposed to behave). So we
-        substitute NaN -> np.inf only for the Dijkstra call. The
-        original arr (with NaN) is preserved for everything else.
+        skimage.graph.MCP_Geometric crashes on NaN; substitute NaN → inf
+        for this call only. The original arr (with NaN walls) is kept for
+        everything else.
         """
         from skimage.graph import MCP_Geometric
         rows, cols = arr.shape
-        rr, cc = np.unravel_index(origin_flat_ids, (rows, cols))
+        rr, cc = np.unravel_index(source_cells, (rows, cols))
         starts = list(zip(rr.tolist(), cc.tolist()))
 
         arr_for_mcp = np.where(np.isfinite(arr), arr, np.inf)
@@ -520,23 +485,15 @@ class AsfConnectivityTask(QgsTask):
         return cost_grid, mcp
 
     # -----------------------------------------------------------------
-    def _auto_aoi_mask(self, cost_grid, origin_flat_ids, shape):
-        """Every cell reachable from the origin.
+    def _auto_aoi_mask(self, cost_grid, source_cells, shape):
+        """Every cell reachable from the source disc.
 
-        The AOI is now just "cost is finite" - i.e. every pixel the
-        origin can reach across the resistance surface, no matter how
-        expensive the route. Cells behind NaN walls (highways, large
-        lakes, fences) get cost == inf and are excluded automatically.
-        Cells with valid resistance that are simply far away stay in
-        the AOI; the risk function exp(-cost/scale) takes care of the
-        "low signal at distance" interpretation by itself, so no extra
-        cost threshold is needed.
+        AOI = cells with finite Dijkstra cost. Cells behind NaN walls
+        get cost == inf and are excluded automatically.
         """
         rows, cols = shape
         aoi = np.isfinite(cost_grid)
-        # Always include the origin disc, even if the read-window
-        # padding produced an unusual cost value at it.
-        rr, cc = np.unravel_index(origin_flat_ids, (rows, cols))
+        rr, cc = np.unravel_index(source_cells, (rows, cols))
         aoi[rr, cc] = True
         return aoi
 
@@ -668,8 +625,8 @@ class AsfConnectivityTask(QgsTask):
                 f"clusters ({n_features} clusters).",
                 LOG_TAG, Qgis.Info)
 
-        # --- Identify the cluster(s) overlapping the origin disc -----
-        origin_ids = self._origin_disc_mask((rows, cols), win_tf, arr=arr)
+        # --- Identify the cluster(s) overlapping the source disc -----
+        origin_ids = self._point_source_cells((rows, cols), win_tf)
         origin_patch_ids = set()
         if origin_ids.size:
             orr, occ = np.unravel_index(origin_ids, (rows, cols))
@@ -815,12 +772,69 @@ class AsfConnectivityTask(QgsTask):
             risk.astype(np.float32), win_tf, prefix="risk")
 
     # -----------------------------------------------------------------
+    def _point_source_cells(self, shape, win_tf, arr=None):
+        """Flat-index array of a small disc (radius = origin_radius_cells)
+        around self.origin_xy.
+
+        When arr is supplied, cells that are impassable (NaN) are stripped
+        from the disc. If the entire disc is impassable, the centre snaps
+        to the nearest passable cell via _snap_to_passable and self.origin_xy
+        is updated accordingly.
+        """
+        rows, cols = shape
+        try:
+            inv = ~win_tf
+        except Exception:
+            return np.array([], dtype=np.intp)
+        c0, r0 = inv * self.origin_xy
+        r0_i = int(round(r0))
+        c0_i = int(round(c0))
+        radius = max(1, self.origin_radius_cells)
+
+        rr, cc = np.meshgrid(
+            np.arange(max(0, r0_i - radius), min(rows, r0_i + radius + 1)),
+            np.arange(max(0, c0_i - radius), min(cols, c0_i + radius + 1)),
+            indexing="ij",
+        )
+        in_disc = (rr - r0_i) ** 2 + (cc - c0_i) ** 2 <= radius * radius
+        rr_d = rr[in_disc].astype(np.intp)
+        cc_d = cc[in_disc].astype(np.intp)
+
+        if arr is not None and rr_d.size > 0:
+            passable = np.isfinite(arr[rr_d, cc_d])
+            if passable.any():
+                rr_d = rr_d[passable]
+                cc_d = cc_d[passable]
+            else:
+                snap = self._snap_to_passable(arr, r0_i, c0_i)
+                if snap is None:
+                    return np.array([], dtype=np.intp)
+                r0_i, c0_i = snap
+                x_snap, y_snap = rio_xy(win_tf, r0_i, c0_i)
+                QgsMessageLog.logMessage(
+                    "Origin click is on an impassable cell. Snapped to "
+                    f"nearest passable cell: "
+                    f"({self.origin_xy[0]:.1f}, {self.origin_xy[1]:.1f})"
+                    f" → ({x_snap:.1f}, {y_snap:.1f}).",
+                    LOG_TAG, Qgis.Warning)
+                self.origin_xy = (float(x_snap), float(y_snap))
+                return self._point_source_cells(shape, win_tf, arr=arr)
+
+        if rr_d.size == 0:
+            if 0 <= r0_i < rows and 0 <= c0_i < cols:
+                return np.array([r0_i * cols + c0_i], dtype=np.intp)
+            return np.array([], dtype=np.intp)
+        return (rr_d * cols + cc_d).astype(np.intp)
+
     # Pinchpoint raster: Circuit theory with AOI boundary as sink.
     # -----------------------------------------------------------------
-    def _try_circuitscape_jl(self, arr, win_tf, origin_flat_ids):
+    def _try_circuitscape_jl(self, arr, win_tf):
         rows, cols = arr.shape
+        cs_source_ids = self._point_source_cells(arr.shape, win_tf)
+        if cs_source_ids.size == 0:
+            return False
         source_mask = np.zeros((rows, cols), dtype=bool)
-        srr, scc = np.unravel_index(origin_flat_ids, (rows, cols))
+        srr, scc = np.unravel_index(cs_source_ids, (rows, cols))
         source_mask[srr, scc] = True
 
         sink_mask = self._aoi_boundary_mask()
@@ -843,14 +857,22 @@ class AsfConnectivityTask(QgsTask):
             log=_log,
         )
 
-        # Save the raw current density (no log transform, no source
-        # mask). The renderer's percentile stretch on the actual data
-        # is the only post-processing applied at visualisation time.
+        # Suppress the source zone: all source cells are held at the
+        # injection voltage, so the voltage gradient between them is
+        # nearly zero → near-zero current density → misleading dark
+        # "dead zone" at the outbreak origin on the Magma ramp.
+        # The corridor map should show where disease spreads TO, not
+        # that the origin exists (that's already shown by the origin
+        # marker). Setting source cells to NaN removes the artifact
+        # without affecting any corridor information.
+        current = current.astype(np.float32)
+        current[source_mask] = np.nan
+
         self.current_raster_path = self._mask_crop_write_raster(
-            current.astype(np.float32), win_tf, prefix="pinchpoints_cs")
+            current, win_tf, prefix="pinchpoints_cs")
         return True
 
-    def _single_source_current_scipy(self, arr, win_tf, crs, origin_flat_ids):
+    def _single_source_current_scipy(self, arr, win_tf, crs):
         """scipy fallback: assemble L, solve once for origin disc vs AOI border.
 
         NaN (impassable) cells would create zero-degree isolated nodes
@@ -885,9 +907,11 @@ class AsfConnectivityTask(QgsTask):
         col  = np.concatenate([   e_j,    e_i,    e_i,    e_j])
         L = coo_matrix((data, (row, col)), shape=(n, n)).tocsc()
 
-        # Source: origin disc.
+        cs_source_ids = self._point_source_cells(arr.shape, win_tf)
+        if cs_source_ids.size == 0:
+            return
         bvec = np.zeros(n)
-        bvec[origin_flat_ids] += 1.0 / origin_flat_ids.size
+        bvec[cs_source_ids] += 1.0 / cs_source_ids.size
 
         # Sink: AOI boundary cells.
         sink_mask = self._aoi_boundary_mask()
@@ -911,13 +935,15 @@ class AsfConnectivityTask(QgsTask):
         np.add.at(node_current, e_i, np.abs(edge_I))
         np.add.at(node_current, e_j, np.abs(edge_I))
         node_current *= 0.5
-        node_current = node_current.reshape(rows, cols).astype(np.float64)
+        node_current = node_current.reshape(rows, cols).astype(np.float32)
 
-        # Save the raw current density (no log transform, no source
-        # mask). The renderer's percentile stretch on the actual data
-        # is the only post-processing applied at visualisation time.
+        # Suppress the point-source disc (same NaN masking as the
+        # Circuitscape.jl path).
+        srr, scc = np.unravel_index(cs_source_ids, (rows, cols))
+        node_current[srr, scc] = np.nan
+
         self.current_raster_path = self._mask_crop_write_raster(
-            node_current.astype(np.float32), win_tf, prefix="pinchpoints")
+            node_current, win_tf, prefix="pinchpoints")
 
     # -----------------------------------------------------------------
     # Biased Correlated Random Walk (BCRW) from the origin.
@@ -963,10 +989,10 @@ class AsfConnectivityTask(QgsTask):
     # surface as the Circuit-theory current map (Saerens et al.
     # 2009, RSP framework), which is a useful sanity check.
     # -----------------------------------------------------------------
-    def _random_walks(self, arr, win_tf, crs, origin_flat_ids,
+    def _random_walks(self, arr, win_tf, crs, source_cells,
                       n_walks=500, max_steps=2000, kappa=2.0):
         rows, cols = arr.shape
-        rr, cc = np.unravel_index(origin_flat_ids, (rows, cols))
+        rr, cc = np.unravel_index(source_cells, (rows, cols))
         starts = np.column_stack([rr, cc])
 
         visit = np.zeros((rows, cols), dtype=np.int64)
@@ -1067,6 +1093,85 @@ class AsfConnectivityTask(QgsTask):
                 LOG_TAG, Qgis.Info)
 
     # =================================================================
+    # iSSF-IBMM: agent simulation using habitat suitability as the
+    # step-selection surface.
+    # =================================================================
+    def _run_ibmm(self, arr, win_tf, source_cells):
+        """Simulate n_agents infected wild-boar trajectories (iSSF-IBMM).
+
+        Each agent:
+          - Starts at a random cell in the outbreak zone.
+          - Lives for a stochastic number of active steps sampled from
+            Gamma(ASF_IP_GAMMA_SHAPE, ASF_IP_GAMMA_SCALE_DAYS) × steps/day,
+            representing the time from infection to death (EFSA 2018).
+          - At each step selects the next cell from IBMM_N_CANDIDATES
+            candidates proportional to 1/resistance (the iSSF selection rule).
+        Output: contamination-probability raster = fraction of agents that
+        visit each cell.
+        """
+        n_agents = int(self.options.get("n_agents", 2000))
+
+        # iSSF selection surface: w = 1/R.
+        # Low resistance = high habitat preference (the resistance surface
+        # was built by inverting the iSSF suitability, so inverting it
+        # back recovers the original selection weights).
+        finite_mask = np.isfinite(arr) & (arr > 0)
+        hs = np.where(finite_mask, 1.0 / arr, 0.0).astype(np.float64)
+
+        mean_ip_days = ASF_IP_GAMMA_SHAPE * ASF_IP_GAMMA_SCALE_DAYS
+        mean_steps = int(round(mean_ip_days * ASF_ACTIVE_STEPS_PER_DAY))
+        QgsMessageLog.logMessage(
+            f"iSSF-IBMM: {n_agents} agents; "
+            f"infectious period Gamma(shape={ASF_IP_GAMMA_SHAPE}, "
+            f"scale={ASF_IP_GAMMA_SCALE_DAYS} d) "
+            f"→ mean {mean_ip_days:.1f} d / {mean_steps} steps; "
+            f"step Gamma(shape={IBMM_SL_GAMMA_SHAPE}, "
+            f"scale={IBMM_SL_GAMMA_SCALE_M} m); "
+            f"kappa={IBMM_KAPPA}; "
+            f"{IBMM_N_CANDIDATES} candidates/step.",
+            LOG_TAG, Qgis.Info)
+
+        prob = simulate_ibmm(
+            hab_suitability=hs,
+            nodata_mask=self.nodata_mask,
+            source_cells=source_cells,
+            win_tf=win_tf,
+            aoi_mask=self.aoi_mask,
+            n_agents=n_agents,
+            cancel_check=self.isCanceled,
+        )
+
+        if prob is not None and float(prob.sum()) > 0:
+            grid = prob.copy()
+
+            # Threshold: drop cells visited by fewer than 1 agent.
+            # This scales with n_agents (principled minimum detectable signal)
+            # and avoids showing numerical noise from near-zero visitation.
+            min_prob = 1.0 / max(n_agents, 1)
+            grid[grid < min_prob] = np.nan
+
+            # Log₁₀ transform: contamination probability spans ~3 orders of
+            # magnitude (origin ≈ 1, far cells ≈ 1/n_agents ≈ 5e-4). Linear
+            # scale collapses all distant structure into near-black; log scale
+            # spreads the gradient across the full color ramp so corridors and
+            # barriers are readable everywhere, not just at the outbreak zone.
+            valid = np.isfinite(grid)
+            if valid.any():
+                grid[valid] = np.log10(grid[valid])
+            # Values now range from log10(1/n_agents) ≈ -3.3 to 0.0
+
+            self.ibmm_raster_path = self._mask_crop_write_raster(
+                grid, win_tf, prefix="ibmm")
+            peak_raw = float(np.nanmax(prob)) if prob is not None else 0.0
+            QgsMessageLog.logMessage(
+                f"iSSF-IBMM: completed. Peak contamination probability: "
+                f"{peak_raw:.4f} ({peak_raw * 100:.1f}% of agents). "
+                f"Output: log10(p), range "
+                f"[{float(np.nanmin(grid)):.2f}, {float(np.nanmax(grid)):.2f}] "
+                f"(threshold: p ≥ {min_prob:.4f} = 1 agent).",
+                LOG_TAG, Qgis.Info)
+
+    # =================================================================
     # Mask + crop + write helper
     # =================================================================
     def _mask_crop_write_raster(self, grid, win_tf, prefix):
@@ -1123,11 +1228,6 @@ class AsfConnectivityTask(QgsTask):
             QMessageBox.critical(None, "Wildboar Connectivity", msg)
             return
 
-        # If the origin was snapped from an impassable click, show the
-        # actual analysis origin so the user can see what happened.
-        if self.origin_was_snapped:
-            self._add_snapped_origin_layer()
-
         # LCP corridors as merged lines (one feature per uniform-traffic run)
         if self.merged_lcp_polylines:
             self._add_lcp_lines_layer()
@@ -1159,9 +1259,18 @@ class AsfConnectivityTask(QgsTask):
                 f"Random walk density (BCRW, n = {n})")
             if r.isValid():
                 self._apply_singleband_ramp(r, "Viridis")
-                # Sits just above the pinchpoint raster so the user can
-                # eyeball BCRW vs Circuitscape - they should agree.
                 add_wildboar_layer(r, ZOrder.PINCHPOINTS - 1)
+
+        # iSSF-IBMM contamination probability (log10-scaled)
+        if self.ibmm_raster_path:
+            n = int(self.options.get("n_agents", 2000))
+            r = QgsRasterLayer(
+                self.ibmm_raster_path,
+                f"ASF contamination probability log₁₀(p) "
+                f"— iSSF-IBMM, n = {n} agents")
+            if r.isValid():
+                self._apply_singleband_ramp(r, "Magma")
+                add_wildboar_layer(r, ZOrder.IBMM_DENSITY)
 
         QgsMessageLog.logMessage(
             "Done. lcps={l}({s} segments) pinch={p} risk={r} walks={w}".format(
@@ -1240,28 +1349,6 @@ class AsfConnectivityTask(QgsTask):
         renderer = QgsGraduatedSymbolRenderer("traffic", ranges)
         layer.setRenderer(renderer)
         add_wildboar_layer(layer, ZOrder.LCP_TRAFFIC)
-
-    # -----------------------------------------------------------------
-    def _add_snapped_origin_layer(self):
-        """Marker showing where the analysis origin actually sits after
-        the impassable-click snap. The original click point is still
-        displayed by main_plugin as the red 'Outbreak origin' marker;
-        this orange marker shows the snapped position so the user can
-        see both."""
-        layer = QgsVectorLayer(
-            f"Point?crs={self.crs_wkt}",
-            "Outbreak origin (snapped to passable cell)",
-            "memory")
-        prov = layer.dataProvider()
-        f = QgsFeature()
-        f.setGeometry(QgsGeometry.fromPointXY(
-            QgsPointXY(self.origin_xy[0], self.origin_xy[1])))
-        prov.addFeature(f)
-        layer.updateExtents()
-        sym = layer.renderer().symbol()
-        sym.setColor(QColor("#f39c12"))   # orange - distinct from the red click
-        sym.setSize(5.0)
-        add_wildboar_layer(layer, ZOrder.CENTRE)
 
     # -----------------------------------------------------------------
     def _add_forest_anchors_layer(self):

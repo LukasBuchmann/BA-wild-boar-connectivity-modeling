@@ -45,10 +45,11 @@ class ZOrder:
     SELECTED_HABITATS  = 1
     LCP_TRAFFIC        = 2
     PINCHPOINTS        = 3
-    GRAPH_NODES        = 4
-    GRAPH_EDGES        = 5
-    CENTRE             = 6
-    RANGE              = 7
+    IBMM_DENSITY       = 4   # iSSF-IBMM agent visit density
+    GRAPH_NODES        = 5
+    GRAPH_EDGES        = 6
+    CENTRE             = 7
+    RANGE              = 8
 
 
 def _correct_index_for_z(z: int) -> int:

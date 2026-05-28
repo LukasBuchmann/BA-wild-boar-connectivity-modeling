@@ -276,7 +276,8 @@ class WildboarConnectivity:
         if not (self.dlg.chkLcp.isChecked()
                 or self.dlg.chkCircuit.isChecked()
                 or self.dlg.chkRisk.isChecked()
-                or self.dlg.chkRandomWalk.isChecked()):
+                or self.dlg.chkRandomWalk.isChecked()
+                or self.dlg.chkIBMM.isChecked()):
             self._warn("Enable at least one output.")
             return
 
@@ -342,6 +343,8 @@ class WildboarConnectivity:
             "random_walk":         self.dlg.chkRandomWalk.isChecked(),
             "n_walks":             int(self.dlg.spnNWalks.value()),
             "walk_kappa":          2.0,    # moderate directional persistence
+            "ibmm":                self.dlg.chkIBMM.isChecked(),
+            "n_agents":            int(self.dlg.spnNAgents.value()),   # default 2000
             "habitats_geojson":    habitats_geojson,
         }
         self.dlg.lblStatus.setText(

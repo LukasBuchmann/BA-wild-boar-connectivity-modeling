@@ -120,6 +120,35 @@
         </item>
        </layout>
       </item>
+      <item>
+       <layout class="QHBoxLayout" name="hIBMM">
+        <item>
+         <widget class="QCheckBox" name="chkIBMM">
+          <property name="text"><string>iSSF-IBMM agent simulation (n =</string></property>
+          <property name="checked"><bool>false</bool></property>
+          <property name="toolTip">
+           <string>Individual-Based Movement Model driven by the fitted iSSF. Agents start at the outbreak zone and select steps proportionally to the habitat suitability raster (exp(sum beta_i * covariate_i)). Step lengths follow a Gamma distribution calibrated to GPS telemetry (mean ~400 m at 15-min interval); turning angles follow a von Mises distribution (kappa=0.5). Select the iSSF raster in the Inputs section above.</string>
+          </property>
+         </widget>
+        </item>
+        <item>
+         <widget class="QSpinBox" name="spnNAgents">
+          <property name="minimum"><number>100</number></property>
+          <property name="maximum"><number>5000</number></property>
+          <property name="value"><number>2000</number></property>
+          <property name="singleStep"><number>100</number></property>
+         </widget>
+        </item>
+        <item>
+         <widget class="QLabel" name="lblAgentsTail">
+          <property name="text"><string>agents)</string></property>
+         </widget>
+        </item>
+        <item>
+         <spacer><property name="orientation"><enum>Qt::Horizontal</enum></property></spacer>
+        </item>
+       </layout>
+      </item>
      </layout>
     </widget>
    </item>

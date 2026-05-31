@@ -1,68 +1,107 @@
-# Statistische Outputs
+# Statistical Outputs and Model Parameters
 
-## Vollständige Regressionsanalyse
+This appendix collects the full statistical output of the integrated step-selection function and the parameter settings of the five plugin analysis modules, so that the results in the main text can be reproduced and audited.
+
+## Final iSSF Coefficients
+
+The final conditional logistic regression was fitted on 7,810 in-matrix transit steps from 36 GPS-collared individuals in Canton Aargau, each compared against ten random control steps. All covariates are z-standardised with the Aargau training mean and standard deviation. The seven retained coefficients, ordered by magnitude, are reproduced in @tbl-issf-coefficients in the results chapter and summarised here for reference: forest density at the 50-metre scale ($\hat{\beta} = 0.513$), distance to railway ($\hat{\beta} = 0.513$), forest density gradient at the 1000-metre scale ($\hat{\beta} = 0.245$), distance to settlement ($\hat{\beta} = 0.224$), distance to main road ($\hat{\beta} = 0.218$), distance to secondary road ($\hat{\beta} = 0.149$), and distance to water ($\hat{\beta} = 0.051$). All coefficients were positive and significant at the 0.05 level, and all variance inflation factors for the retained set were below 1.4.
+
+## Variable Selection Record
+
+| Covariate | Decision | Reason |
+|---|---|---|
+| Forest density 50 m | Retained | Strongest selection signal |
+| Forest density gradient 1000 m | Retained | Macro-scale habitat context |
+| Distance to water | Retained | Weak but significant |
+| Distance to main road | Retained | Infrastructure avoidance |
+| Distance to secondary road | Retained | Infrastructure avoidance |
+| Distance to settlement | Retained | Infrastructure avoidance |
+| Distance to railway | Retained | Strong avoidance, wider CI |
+| Binary forest cover | Removed | Redundant with density layers |
+| Distance to forest edge | Removed | Redundant with density layers |
+| Slope | Removed | VIF > 80 with TRI, non-significant |
+| Terrain Ruggedness Index | Removed | VIF > 80 with slope, non-significant |
+| Distance to flowing water | Removed | Collinear with combined distance to water |
+| Distance to lakes | Removed | Collinear with combined distance to water |
+| Distance to fenced road | Removed | Barrier-trapping artifact ($\hat{\beta} = -0.60$) |
+
+: Variable selection decisions for the iSSF covariate set. {#tbl-varselection}
+
+## Plugin Analysis Parameters
+
+The five analytical modules of the *Wildboar Connectivity (ASF)* plugin use the following fixed parameters. The analysis window extends 11,500 metres in each direction from the outbreak origin (a 10,000-metre buffer plus a 1,500-metre edge buffer). The infection-risk kernel uses the published mean natal dispersal distance of European wild boar of 4 kilometres, with the EFSA protection zone (3 km) and surveillance zone (10 km) mapped to risk thresholds of 0.50 and 0.15. The biased correlated random walk uses a von Mises concentration of $\kappa = 2.0$, a 2,000-step limit, and 500 realisations by default. The iSSF-based individual movement model runs 2,000 agents by default, draws the infectious period from a $\text{Gamma}(\alpha = 3, \beta = 3.5\,\text{days})$ distribution (mean 10.5 days), and generates 25 candidate steps per move using a gamma step-length kernel (shape 2.653, scale 160 m) and a von Mises turning kernel ($\kappa = 1.064$).
+
+## Reproducing the Statistical Output
+
+The iSSF coefficient table, the step classification counts, and all covariate summary statistics reported in the results chapter are produced directly from the processed data files by the R code chunks embedded in `5-ergebnisse.qmd`. Running the Quarto document against the processed data directory regenerates every table and figure deterministically.
+
+## Excluded Covariate Layers
+
+The following maps document the covariate layers that were computed in the pipeline but excluded from the final iSSF model. They are provided here for completeness and spatial context.
 
 ```{r}
-#| label: tbl-full-regression
-#| tbl-cap: "Detaillierte Regressionsstatistiken"
+#| label: setup-appendix
+#| include: false
 
-library(MASS)
-data(Animals)
-model <- lm(log(brain) ~ log(body), data = Animals)
-summary_full <- summary(model)
+project_root <- "C:/ZHAW/6.Semester/BA/BA-wild-boar-connectivity-modeling"
+data_temp    <- file.path(project_root, "data/temp")
 
-library(knitr)
-regression_stats <- data.frame(
-  Statistik = c("Multiple R-squared", "Adjusted R-squared", "F-statistic",
-                "F p-value", "Residual standard error", "Degrees of freedom"),
-  Wert = c(
-    round(summary_full$r.squared, 4),
-    round(summary_full$adj.r.squared, 4),
-    round(summary_full$fstatistic[1], 2),
-    ifelse(pf(summary_full$fstatistic[1], summary_full$fstatistic[2],
-             summary_full$fstatistic[3], lower.tail = FALSE) < 0.001,
-           "< 0.001",
-           round(pf(summary_full$fstatistic[1], summary_full$fstatistic[2],
-                    summary_full$fstatistic[3], lower.tail = FALSE), 4)),
-    round(summary_full$sigma, 4),
-    paste(summary_full$df[2], "on", summary_full$df[1], "DF")
-  )
-)
+options(repos = c(CRAN = "https://cloud.r-project.org"))
+for (p in c("terra", "knitr")) {
+  if (!requireNamespace(p, quietly = TRUE)) install.packages(p)
+  suppressPackageStartupMessages(library(p, character.only = TRUE))
+}
+knitr::opts_chunk$set(echo = FALSE, warning = FALSE, message = FALSE, dpi = 150)
 
-kable(regression_stats)
+stk <- rast(file.path(data_temp, "covariate_stack.tif"))
+names(stk) <- c("forest", "forest_density", "forest_density_g",
+                "dist_forest_edge", "slope", "tri",
+                "dist_flowing", "dist_lakes", "dist_water",
+                "dist_fenced_road", "dist_main_road",
+                "dist_secondary_road", "dist_settlement", "dist_railway")
 ```
 
-## Koeffizienten mit Konfidenzintervallen
-
 ```{r}
-#| label: tbl-coefficients
-#| tbl-cap: "Regressionskoeffizienten mit 95% Konfidenzintervallen"
+#| label: fig-forest-edge-dist
+#| fig-cap: "Distance to forest edge (metres) for the Aargau study area. Values range from 25 m (the minimum possible at 25-metre resolution) to 3,281 m. This layer was excluded from the final iSSF model because of its high VIF with the forest density layers."
+#| fig-width: 5.5
+#| fig-height: 4.5
 
-coef_table <- data.frame(
-  Parameter = c("Intercept (log a)", "Steigung (b)"),
-  Schätzung = round(coef(model), 4),
-  Standardfehler = round(summary_full$coefficients[,2], 4),
-  t_Wert = round(summary_full$coefficients[,3], 3),
-  p_Wert = ifelse(summary_full$coefficients[,4] < 0.001, "< 0.001",
-                  round(summary_full$coefficients[,4], 4)),
-  CI_2.5 = round(confint(model)[,1], 4),
-  CI_97.5 = round(confint(model)[,2], 4)
-)
-
-kable(coef_table)
+r_dfe <- aggregate(stk[["dist_forest_edge"]], 5, "mean", na.rm = TRUE)
+par(mar = c(1.5, 1.5, 3, 5))
+plot(r_dfe, col = hcl.colors(100, "Blues"),
+     main = "Distance to Forest Edge (m)\n[excl. by VIF]",
+     axes = FALSE, plg = list(cex = 0.8))
 ```
 
-## Modelldiagnostik
+```{r}
+#| label: fig-terrain-covariates
+#| fig-cap: "Terrain covariates derived from the DHM25 digital elevation model. **Left:** Slope in degrees. **Right:** Terrain Ruggedness Index (TRI, dimensionless). Both layers were excluded from the final iSSF model due to extreme multicollinearity with the forest density layers (VIF > 80)."
+#| fig-width: 9
+#| fig-height: 4.2
+
+par(mfrow = c(1, 2), mar = c(1.5, 1.5, 3.2, 5.5))
+
+r_sl <- aggregate(stk[["slope"]], 5, "mean", na.rm = TRUE)
+plot(r_sl, col = hcl.colors(100, "YlOrBr"),
+     main = "Slope (degrees)\n[excl. by VIF, collinear with forest]",
+     axes = FALSE, plg = list(cex = 0.8))
+
+r_tr <- aggregate(stk[["tri"]], 5, "mean", na.rm = TRUE)
+plot(r_tr, col = hcl.colors(100, "YlOrBr"),
+     main = "Terrain Ruggedness Index\n[excl. by VIF, collinear with forest]",
+     axes = FALSE, plg = list(cex = 0.8))
+```
 
 ```{r}
-#| label: fig-diagnostics
-#| fig-cap: "Diagnostische Plots für die Regressionsanalyse"
-#| fig-height: 8
+#| label: fig-fenced-road
+#| fig-cap: "Distance to fenced road (motorway and motorway access segments) in the Aargau study area. The extreme spatial sparsity of this feature (mean 4,179 m, maximum 16,710 m) produced a barrier-trapping artifact in the iSSF and led to exclusion of this covariate before model fitting."
+#| fig-width: 5.5
+#| fig-height: 4.5
 
-par(mfrow = c(2, 2))
-plot(model, which = 1:4, caption = c("Residuen vs. Angepasste Werte",
-                                     "Q-Q Plot der Residuen",
-                                     "Scale-Location Plot",
-                                     "Residuen vs. Leverage"))
-par(mfrow = c(1, 1))
+r_dfr <- aggregate(stk[["dist_fenced_road"]], 5, "mean", na.rm = TRUE)
+par(mar = c(1.5, 1.5, 3, 5.5))
+plot(r_dfr, col = hcl.colors(100, "Blues"),
+     main = "Distance to Fenced Road (m)\n[excl. barrier-trapping artifact]",
+     axes = FALSE, plg = list(cex = 0.8))
 ```

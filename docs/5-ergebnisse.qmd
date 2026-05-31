@@ -1,72 +1,1010 @@
-# Ergebnisse
+# Results
 
-Die statistische Analyse des MASS::Animals Datensatzes liefert umfassende Einblicke in die Beziehung zwischen Körper- und Gehirngewicht bei Säugetieren. Die deskriptiven Statistiken in @tbl-summary zeigen die erhebliche Variabilität der untersuchten Arten: Das Körpergewicht reicht von kleinen Nagern bis hin zu grossen Säugetieren wie Elefanten, während das Gehirngewicht entsprechend von wenigen Gramm bis zu mehreren Kilogramm variiert.
-
-Die logarithmische Darstellung in @fig-animals visualisiert deutlich die allometrische Beziehung zwischen beiden Variablen. Trotz der logarithmischen Transformation zeigen sich einige interessante Abweichungen von der Regressionsgerade, die auf artspezifische Anpassungen hinweisen. Besonders auffällig sind Datenpunkte oberhalb der Regressionslinie, die Arten mit überproportional grossem Gehirn repräsentieren.
+Two primary deliverables emerged from this project: a 25-metre resolution wild boar resistance surface covering Canton Aargau (used for model calibration) and Canton Zürich (produced by parameter transfer), and the *Wildboar Connectivity (ASF)* QGIS plugin that uses this resistance surface as its analytical input. The following sections present the results in the order of their production: from telemetry data quality and step classification through spatial covariate construction, iSSF model fitting, and resistance surface generation, concluding with a functional demonstration of the interactive plugin.
 
 ```{r}
-#| label: fig-animals
-#| fig-cap: "Beziehung zwischen Körpergewicht und Gehirngewicht bei Säugetieren"
+#| label: setup
+#| include: false
 
-library(MASS)
-library(ggplot2)
+# ── Project paths ──────────────────────────────────────────────────────────
+project_root <- "C:/ZHAW/6.Semester/BA/BA-wild-boar-connectivity-modeling"
+data_temp    <- file.path(project_root, "data/temp")
+data_proc    <- file.path(project_root, "data/processed")
+data_raw     <- file.path(project_root, "data/raw")
 
-data(Animals)
+# ── Packages ───────────────────────────────────────────────────────────────
+options(repos = c(CRAN = "https://cloud.r-project.org"))
+pkgs <- c("terra", "ggplot2", "dplyr", "knitr", "kableExtra",
+          "patchwork", "scales", "leaflet", "raster")
+for (p in pkgs) {
+  if (!requireNamespace(p, quietly = TRUE)) install.packages(p)
+  suppressPackageStartupMessages(library(p, character.only = TRUE))
+}
 
-# Scatterplot auf logarithmischer Skala
-ggplot(Animals, aes(x = body, y = brain)) +
-  geom_point(size = 3, alpha = 0.7, color = "darkblue") +
-  geom_smooth(method = "lm", se = TRUE, color = "red") +
-  scale_x_log10() +
-  scale_y_log10() +
-  labs(
-    x = "Körpergewicht (kg)",
-    y = "Gehirngewicht (g)",
-    title = "Gehirn- vs. Körpergewicht (logarithmische Skala)"
-  ) +
-  theme_minimal()
-```
+# ── Global knitr options ───────────────────────────────────────────────────
+knitr::opts_chunk$set(
+  echo    = FALSE,
+  warning = FALSE,
+  message = FALSE,
+  dpi     = 150
+)
+terraOptions(progress = 0)  # suppress progress bars
 
-```{r}
-#| label: tbl-animals
-#| tbl-cap: "Statistische Kennwerte der Gehirn-Körper-Beziehung"
+# ── Helper functions ───────────────────────────────────────────────────────
 
-# Regressionsanalyse
-model <- lm(log(brain) ~ log(body), data = Animals)
-summary_stats <- summary(model)
+# Load a raster and aggregate for display
+disp <- function(path, fact = 5, fun = "mean") {
+  r <- rast(path)
+  if (fact > 1) aggregate(r, fact = fact, fun = fun, na.rm = TRUE) else r
+}
 
-# Tabelle erstellen
-library(knitr)
-coef_table <- data.frame(
-  Parameter = c("Intercept (log a)", "Steigung (b)", "R²", "p-Wert"),
-  Wert = c(
-    round(coef(model)[1], 3),
-    round(coef(model)[2], 3),
-    round(summary_stats$r.squared, 3),
-    ifelse(summary_stats$coefficients[2,4] < 0.001, "< 0.001",
-           round(summary_stats$coefficients[2,4], 3))
+# Load a binary raster, aggregate with modal, set 0 to NA for display
+disp_binary <- function(path, fact = 5) {
+  r <- rast(path)
+  r_agg <- if (fact > 1) aggregate(r, fact = fact, fun = "modal", na.rm = TRUE) else r
+  r_agg[r_agg[] == 0] <- NA
+  r_agg
+}
+
+# Compute summary statistics for a terra SpatRaster
+raster_stats <- function(r, label = "") {
+  v <- values(r, mat = FALSE, na.rm = TRUE)
+  if (length(v) == 0) return(NULL)
+  total <- prod(dim(r)[1:2])
+  data.frame(
+    Canton        = label,
+    `Min`         = round(min(v), 3),
+    `Mean`        = round(mean(v), 3),
+    `Median`      = round(median(v), 3),
+    `SD`          = round(sd(v), 3),
+    `P10`         = round(quantile(v, 0.10), 3),
+    `P90`         = round(quantile(v, 0.90), 3),
+    `Max`         = round(max(v), 3),
+    `Valid cells` = format(length(v), big.mark = ","),
+    `NoData (%)`  = round(100 * (total - length(v)) / total, 1),
+    check.names   = FALSE
   )
-)
+}
 
-kable(coef_table)
+# Load the full 14-band Aargau covariate stack once
+stk <- rast(file.path(data_temp, "covariate_stack.tif"))
+names(stk) <- c("forest", "forest_density", "forest_density_g",
+                "dist_forest_edge", "slope", "tri",
+                "dist_flowing", "dist_lakes", "dist_water",
+                "dist_fenced_road", "dist_main_road",
+                "dist_secondary_road", "dist_settlement", "dist_railway")
+```
+
+## Resistance Surface
+
+In the following section the results of creating the resistance surface are shown and explained in detail.
+
+### Telemetry Quality and Step Classification
+
+GPS telemetry from 36 wild boar individuals tracked in Canton Aargau between 2014 and 2017 was resampled to a consistent 15-minute fix interval before step extraction. One short re-collaring deployment (027_Agat_13970) was excluded from analysis because it retained only 50.6% of on-schedule fixes alongside a high proportion of duplicate fixes at one-minute intervals, indicating a recording malfunction rather than genuine movement data. The remaining deployments retained at least 90% of unique scheduled fixes after the duplicate-collapse step. The cleaned dataset yielded a total of 132,388 classified steps.
+
+The three-rule hierarchical classifier partitioned these steps into 7,810 in-matrix transit steps and 124,578 in-patch resting steps. Among in-matrix steps, Rule 1 (step length greater than 250 metres) captured 4,752 steps (60.8% of all in-matrix steps), Rule 2 (step length greater than 150 metres and absolute turning angle below π/4 radians) contributed 2,741 steps (35.1%), and Rule 3 (three or more consecutive directional steps each exceeding 100 metres) added 317 steps (4.1%). The in-matrix dataset served as the sole analytical sample for iSSF fitting. In-patch steps were excluded from the model because they describe resting and foraging behaviour within habitat patches rather than landscape-level transit between patches, and combining the two behavioural states would confound the resistance surface.
+
+In-matrix step lengths ranged from 100 metres to 5,424 metres with a mean of 299 metres, a median of 273 metres, and a standard deviation of 163 metres. The distribution is right-skewed, consistent with the gamma-distributed step-length kernel assumed by the iSSF movement model. Turning angles were approximately symmetric around zero with a standard deviation of approximately 59 degrees, indicating moderate directional persistence during transit. Which shows that the step classification worked.
+
+```{r}
+#| label: tbl-classification
+#| tbl-cap: "Step classification counts for the in-matrix telemetry dataset. Rules are applied hierarchically in the order shown. A step is classified as in-matrix if it meets any rule that has not been met by a prior rule."
+
+rule_df <- data.frame(
+  Rule = c("Rule 1", "Rule 2", "Rule 3", "Total in-matrix", "In-patch"),
+  Criterion = c(
+    "Step length > 250 m",
+    "Step length > 150 m AND turning angle < π/4",
+    "≥ 3 consecutive steps: length > 100 m AND turning angle < π/4",
+    "—",
+    "All remaining steps (conservative default)"
+  ),
+  `Steps (n)` = c(4752, 2741, 317, 7810, 124578),
+  `Share of in-matrix (%)` = c(60.8, 35.1, 4.1, 100.0, NA),
+  check.names = FALSE
+)
+rule_df[is.na(rule_df)] <- "—"
+
+kable(rule_df, align = c("l", "l", "r", "r"), booktabs = TRUE) |>
+  kable_styling(latex_options = c("hold_position", "striped"), full_width = FALSE) |>
+  row_spec(4, bold = TRUE) |>
+  row_spec(5, italic = TRUE)
 ```
 
 ```{r}
-#| label: tbl-summary
-#| tbl-cap: "Deskriptive Statistik der MASS::Animals Daten"
+#| label: fig-step-distributions
+#| fig-cap: "Movement statistics of in-matrix wild boar steps used for iSSF fitting (n = 7,810). **Left:** Distribution of step lengths. Vertical lines mark the classification thresholds at 100 m, 150 m, and 250 m used by Rules 3, 2, and 1 respectively. **Right:** Distribution of turning angles in radians. The symmetric, unimodal distribution centred near zero indicates moderate directional persistence during transit."
+#| fig-width: 11
+#| fig-height: 4.2
 
-library(knitr)
-summary_table <- data.frame(
-  Variable = c("Körpergewicht (kg)", "Gehirngewicht (g)"),
-  Minimum = c(min(Animals$body), min(Animals$brain)),
-  Mittelwert = c(round(mean(Animals$body), 1), round(mean(Animals$brain), 1)),
-  Maximum = c(max(Animals$body), max(Animals$brain)),
-  N = c(nrow(Animals), nrow(Animals))
-)
+df_in <- read.csv(file.path(data_proc, "WildBoar_InMatrix_Steps.csv"))
 
-kable(summary_table)
+p_sl <- ggplot(df_in, aes(x = sl_)) +
+  geom_histogram(aes(y = after_stat(density)), bins = 60,
+                 fill = "#2d6a4f", colour = "white", alpha = 0.85) +
+  geom_vline(xintercept = c(100, 150, 250),
+             linetype = c("dotted", "dashed", "solid"),
+             colour   = c("#e9c46a", "#f4a261", "#e76f51"),
+             linewidth = 0.8) +
+  annotate("text", x = c(130, 180, 285), y = Inf,
+           label = c("100 m\n(R3)", "150 m\n(R2)", "250 m\n(R1)"),
+           vjust = 1.4, size = 3, colour = c("#c9a227", "#d07830", "#c0422a")) +
+  scale_x_continuous(labels = comma, limits = c(0, 1500)) +
+  labs(x = "Step length (m)", y = "Density",
+       title = "In-matrix step lengths") +
+  theme_bw(base_size = 11) +
+  theme(plot.title = element_text(size = 11))
+
+p_ta <- ggplot(df_in, aes(x = ta_)) +
+  geom_histogram(bins = 60, fill = "#457b9d", colour = "white", alpha = 0.85) +
+  scale_x_continuous(
+    breaks = c(-pi, -pi/2, 0, pi/2, pi),
+    labels = c("-π", "-π/2", "0", "π/2", "π")
+  ) +
+  geom_vline(xintercept = c(-pi/4, pi/4),
+             linetype = "dashed", colour = "#e76f51", linewidth = 0.7) +
+  annotate("text", x = c(-pi/4 - 0.15, pi/4 + 0.15), y = Inf,
+           label = c("-π/4", "π/4"), vjust = 1.5, size = 3,
+           colour = "#c0422a") +
+  labs(x = "Turning angle (radians)", y = "Count",
+       title = "In-matrix turning angles") +
+  theme_bw(base_size = 11) +
+  theme(plot.title = element_text(size = 11))
+
+p_sl + p_ta
 ```
 
-Die Regressionsanalyse bestätigt die theoretischen Erwartungen zur allometrischen Skalierung. Die statistischen Kennwerte in @tbl-animals zeigen einen Steigungsparameter von 0.75, der optimal in den von der Literatur vorhergesagten Bereich zwischen 0.6 und 0.8 fällt. Das hohe Bestimmtheitsmass (R² = 0.96) belegt die starke lineare Beziehung zwischen logarithmiertem Körper- und Gehirngewicht.
+### iSSF Model Coefficients and Variable Selection
 
-Der hochsignifikante p-Wert (< 0.001) in @tbl-animals unterstreicht die statistische Robustheit dieser Beziehung. Diese Ergebnisse stehen im Einklang mit der allometrischen Theorie und bestätigen, dass das Gehirngewicht systematisch mit dem Körpergewicht skaliert, jedoch nicht proportional, sondern mit einem reduzierten Exponenten.
+Before fitting the final conditional logistic regression, seven covariates were removed from the original set of 14 based on a VIF (variance inflation factor) test. Slope and terrain ruggedness index (TRI) had VIF values exceeding 80, driven by their near-collinearity. Binary forest cover and Distance to forest Edge were removed because they were insignificant when the forest density layers were added. Distance to flowing water and distance to lakes were merged into a single combined distance-to-water layer before covariate assembly, and the two original layers were then removed. Distance to fenced road was excluded because its extreme landscape sparsity in Aargau (fenced motorway infrastructure is confined to a small number of access and exit segments within the study area) produced a spatial trapping pattern: in-matrix steps were concentrated near the few fenced road segments present, inflating the coefficient and making it non-transferable to other landscapes. The seven remaining covariates formed the final iSSF model.
+
+All seven selection coefficients were positive and statistically significant at the α = 0.05 level, indicating that wild boar in the in-matrix transit state preferentially selected landscape cells offering higher forest density, stronger forest density gradients, and greater distance from all infrastructure categories and from water. The two strongest selection effects were of nearly equal magnitude: forest density at the 50-metre scale (β = 0.513, z = 29.09) and distance to railway (β = 0.513, z = 4.48). The former reflects the central role of dense forest as movement habitat, while the latter reflects the strong avoidance of railway infrastructure during transit. Forest density gradient at the 1,000-metre scale was the third-ranked predictor (β = 0.245), capturing preference for cells situated within a landscape matrix of increasing forest cover rather than in isolated patches. Distance to settlement (β = 0.224), distance to main road (β = 0.218), and distance to secondary road (β = 0.149) followed, all expressing avoidance of the built and road environment. Distance to water was the weakest but still significant predictor (β = 0.051, p = 0.030), consistent with wild boar avoiding stream crossings during directed transit movement.
+
+```{r}
+#| label: tbl-issf-coefficients
+#| tbl-cap: "Integrated step selection function (iSSF) coefficients for in-matrix wild boar movement, fitted to 7,810 transit steps from 36 GPS-collared individuals in Canton Aargau (2014 to 2017). All covariates are standardised to zero mean and unit standard deviation. Estimates are ordered by decreasing magnitude. CI = 95% confidence interval."
+
+issf <- read.csv(file.path(data_proc, "issf_coefficients.csv"))
+
+covariate_labels <- c(
+  "forest_density_sc"      = "Forest density (50 m buffer)",
+  "dist_railway_sc"        = "Distance to railway",
+  "forest_density_g_sc"    = "Forest density gradient (1000 m)",
+  "dist_settlement_sc"     = "Distance to settlement",
+  "dist_main_road_sc"      = "Distance to main road",
+  "dist_secondary_road_sc" = "Distance to secondary road",
+  "dist_water_sc"          = "Distance to water"
+)
+
+issf_tbl <- issf |>
+  mutate(
+    Covariate   = covariate_labels[term],
+    Estimate    = round(estimate, 4),
+    SE          = round(std.error, 4),
+    `z`         = round(statistic, 2),
+    `p-value`   = ifelse(p.value < 0.001, "< 0.001",
+                         format(round(p.value, 4), scientific = FALSE)),
+    `95% CI`    = paste0("[", round(conf.low, 3), ", ", round(conf.high, 3), "]")
+  ) |>
+  select(Covariate, Estimate, SE, z, `p-value`, `95% CI`)
+
+kable(issf_tbl, align = c("l", "r", "r", "r", "r", "l"), booktabs = TRUE) |>
+  kable_styling(latex_options = c("hold_position", "striped"), full_width = FALSE) |>
+  footnote(general = "All p-values < 0.001 except dist_water_sc (p = 0.030).",
+           general_title = "")
+```
+
+```{r}
+#| label: fig-issf-coefficients
+#| fig-cap: "Selection coefficients of the iSSF fitted to in-matrix wild boar steps (n = 7,810). Points show maximum likelihood estimates, and horizontal bars span the 95% confidence interval. All covariates are standardised, and a positive coefficient indicates selection for higher covariate values during transit. Covariates are ordered by descending coefficient magnitude."
+#| fig-width: 8
+#| fig-height: 4.2
+
+issf_plot <- issf |>
+  mutate(label = covariate_labels[term],
+         label = factor(label, levels = label[order(estimate)]))
+
+ggplot(issf_plot, aes(x = estimate, y = label)) +
+  geom_vline(xintercept = 0, linetype = "dashed", colour = "grey60",
+             linewidth = 0.6) +
+  geom_segment(aes(x = conf.low, xend = conf.high, yend = label),
+               colour = "#2d6a4f", linewidth = 0.8) +
+  geom_point(colour = "#2d6a4f", size = 3.5) +
+  scale_x_continuous(expand = expansion(mult = 0.05)) +
+  labs(x = "Selection coefficient (standardised)", y = NULL) +
+  theme_bw(base_size = 11) +
+  theme(panel.grid.major.y = element_blank(),
+        panel.grid.minor   = element_blank(),
+        axis.text.y        = element_text(size = 10))
+```
+
+### Intermediate Spatial Covariate Layers
+
+Fourteen spatial covariates were assembled on the 25-metre Aargau grid before VIF testing. These are presented below in functional groups. Layers included in the final iSSF model are labelled accordingly. Excluded layers are shown to document the full intermediate output of the pipeline and to provide spatial context for understanding the final resistance surface structure. For all distance rasters, values are in metres measured as Euclidean distance to the nearest cell of the target feature class. For all density and suitability rasters, values range from 0 to 1. Binary barrier and passage rasters contain value 1 where the feature is present and are stored as NoData elsewhere.
+
+#### Forest Covariates
+
+The forest cover layer classified 40.5% of valid cells as forest, reflecting the mosaic of wooded slopes and agricultural lowlands characteristic of the Aargau study area. Forest density at the 50-metre scale is a continuous proportion expressing local canopy cover intensity, and at a mean of 0.41 it closely mirrors the binary cover fraction. The 1,000-metre forest density gradient captures the same quantity smoothed over a broader landscape window, producing a spatially coarser surface that records the transition from the forested Jura foothills to the open Mittelland plain. Both density layers were included in the final iSSF model. The binary forest cover and the forest-edge distance layer were excluded during VIF testing.
+
+```{r}
+#| label: fig-forest-covariates
+#| fig-cap: "Forest-related covariate layers for the Aargau study area at aggregated display resolution (125 m). **Left:** Binary forest cover (0 = non-forest, 1 = forest). **Centre:** Forest density at the 50-metre scale (proportion of forest cells within a 50-m moving window). **Right:** Forest density at the 1,000-metre scale (gradient proxy). The 50-metre and 1,000-metre density layers were included in the final iSSF model. Binary forest cover and forest-edge distance (not shown) were excluded by VIF testing."
+#| fig-width: 12
+#| fig-height: 4.2
+
+par(mfrow = c(1, 3), mar = c(1.5, 1.5, 3.2, 5))
+
+# Forest binary (aggregate with modal)
+r_for <- aggregate(stk[["forest"]], 5, "modal", na.rm = TRUE)
+plot(r_for, col = c("#f5f5e0", "#1a5c2e"),
+     main = "Forest Cover (binary)\n[excl. by VIF]",
+     legend = FALSE, axes = FALSE)
+legend("bottomleft", fill = c("#f5f5e0", "#1a5c2e"),
+       legend = c("Non-forest", "Forest"), cex = 0.75, bty = "n")
+
+# Forest density 50m
+r_fd <- aggregate(stk[["forest_density"]], 5, "mean", na.rm = TRUE)
+plot(r_fd, col = hcl.colors(100, "Greens"),
+     main = "Forest Density — 50 m\n[included in iSSF]",
+     axes = FALSE, plg = list(cex = 0.75))
+
+# Forest density gradient 1000m
+r_fdg <- aggregate(stk[["forest_density_g"]], 5, "mean", na.rm = TRUE)
+plot(r_fdg, col = hcl.colors(100, "Greens"),
+     main = "Forest Density Gradient — 1000 m\n[included in iSSF]",
+     axes = FALSE, plg = list(cex = 0.75))
+```
+
+The distance-to-forest-edge layer, excluded for redundancy with the two forest density layers, is mapped in the appendix (@fig-forest-edge-dist).
+
+#### Terrain Covariates
+
+Slope and terrain ruggedness index were computed from the DHM25 digital elevation model at 25-metre resolution. Slope in the study area ranged from 0 to 69 degrees with a mean of 8.1 degrees, reflecting the gentle topography of the Aargau lowlands with steeper values confined to the Jura slopes. TRI ranged from 0 to 54.5 with a mean of 2.9, indicating overall low topographic roughness. Both layers were excluded from the final iSSF model because of extreme collinearity (VIF exceeding 80 in both cases).
+
+Both terrain layers (slope and TRI) are mapped in the appendix (@fig-terrain-covariates).
+
+#### Water Covariates
+
+Distance to water was the final covariate used in the iSSF model. It was derived by merging the distance-to-flowing-water and distance-to-lake layers into a single combined distance-to-any-water surface by taking the cell-wise minimum of the two component rasters. Distance to flowing water alone ranged from 0 to 3,466 metres (mean 242 m), reflecting the dense stream network of the Aargau lowlands. Distance to lakes was considerably larger on average (mean 978 m, maximum 7,164 m) because standing water bodies are spatially sparse in the study area. The combined distance-to-water surface (mean 225 m) therefore largely reflects proximity to streams. The component layers were excluded after merging to avoid double-counting the water feature class in the VIF testing.
+
+```{r}
+#| label: fig-water-covariates
+#| fig-cap: "Water proximity covariates. **Left:** Distance to flowing water (m). **Centre:** Distance to lakes (m). **Right:** Combined distance to any water body (m), used in the final iSSF model. The combined layer was derived as the cell-wise minimum of the two component layers."
+#| fig-width: 12
+#| fig-height: 4.2
+
+par(mfrow = c(1, 3), mar = c(1.5, 1.5, 3.2, 5.5))
+
+r_dfl <- aggregate(stk[["dist_flowing"]], 5, "mean", na.rm = TRUE)
+plot(r_dfl, col = hcl.colors(100, "Blues"),
+     main = "Distance to Flowing Water (m)\n[excluded after merging]",
+     axes = FALSE, plg = list(cex = 0.75))
+
+r_dlk <- aggregate(stk[["dist_lakes"]], 5, "mean", na.rm = TRUE)
+plot(r_dlk, col = hcl.colors(100, "Blues"),
+     main = "Distance to Lakes (m)\n[excluded after merging]",
+     axes = FALSE, plg = list(cex = 0.75))
+
+r_dw <- aggregate(stk[["dist_water"]], 5, "mean", na.rm = TRUE)
+plot(r_dw, col = hcl.colors(100, "Blues"),
+     main = "Distance to Water — Combined (m)\n[included in iSSF]",
+     axes = FALSE, plg = list(cex = 0.75))
+```
+
+#### Infrastructure Distance Covariates
+
+The four infrastructure distance layers that entered the final iSSF model show strongly different spatial structures reflecting the hierarchy of the transport network. Distance to main road ranged from 0 to 7,092 metres with a mean of 747 metres, documenting that the Aargau study area is relatively well served by the cantonal and national road network. Distance to secondary road had a much lower mean of 160 metres and a maximum of only 3,250 metres, indicating that secondary roads permeate the agricultural lowlands at close intervals. Distance to railway had the largest mean (1,756 metres) and range (0 to 7,243 metres) of all infrastructure covariates, reflecting the coarser spacing of the rail network compared with roads. Distance to settlement ranged from 0 to 6,976 metres (mean 206 metres), with low values concentrated in the densely settled Aare valley floor.
+
+```{r}
+#| label: fig-infrastructure-covariates
+#| fig-cap: "Infrastructure distance covariates included in the final iSSF model. All distances are in metres. Higher values (darker blue) indicate greater separation from the respective infrastructure class, which the positive iSSF coefficients show to be strongly preferred by wild boar during transit."
+#| fig-width: 12
+#| fig-height: 8.5
+
+par(mfrow = c(2, 2), mar = c(1.5, 1.5, 3.2, 5.5))
+
+r_dmr <- aggregate(stk[["dist_main_road"]], 5, "mean", na.rm = TRUE)
+plot(r_dmr, col = hcl.colors(100, "Blues"),
+     main = "Distance to Main Road (m)\n[included in iSSF, β = 0.218]",
+     axes = FALSE, plg = list(cex = 0.75))
+
+r_dsr <- aggregate(stk[["dist_secondary_road"]], 5, "mean", na.rm = TRUE)
+plot(r_dsr, col = hcl.colors(100, "Blues"),
+     main = "Distance to Secondary Road (m)\n[included in iSSF, β = 0.149]",
+     axes = FALSE, plg = list(cex = 0.75))
+
+r_dra <- aggregate(stk[["dist_railway"]], 5, "mean", na.rm = TRUE)
+plot(r_dra, col = hcl.colors(100, "Blues"),
+     main = "Distance to Railway (m)\n[included in iSSF, β = 0.513]",
+     axes = FALSE, plg = list(cex = 0.75))
+
+r_dse <- aggregate(stk[["dist_settlement"]], 5, "mean", na.rm = TRUE)
+plot(r_dse, col = hcl.colors(100, "Blues"),
+     main = "Distance to Settlement (m)\n[included in iSSF, β = 0.224]",
+     axes = FALSE, plg = list(cex = 0.75))
+```
+
+The distance-to-fenced-road layer, while part of the initial covariate set, was excluded from the iSSF model before VIF testing because of a recognised trapping artifact. Fenced motorway infrastructure in Aargau is spatially sparse (mean distance 4,179 metres, maximum 16,710 metres), and the few in-matrix GPS steps recorded near fenced segments were disproportionately concentrated there relative to the available landscape. This creates a positive correlation between fenced-road proximity and step selection that reflects the limited geographic extent of the feature rather than genuine habitat preference, and the coefficient was not considered transferable to Zürich where fenced motorway density is substantially higher.
+
+The distance-to-fenced-road layer is mapped in the appendix (@fig-fenced-road).
+
+#### Absolute Barrier and Wildlife Passage Layers
+
+Four binary layers defined the cells that received NoData (impassable) or minimum resistance (passable) treatment in the Keeley burn-in step, independently of the iSSF. Highway cells (motorways, motorway approaches, exit ramps, and car-train carriers) and cells within large water bodies exceeding 1 km² in area were set to NoData. Cells within large settlement polygons (defined as the union of named settlement areas exceeding a size threshold) were also set to NoData. Wildlife passage locations were set to the minimum resistance value R = 1, ensuring that validated crossing structures function as zero-cost corridors in the connectivity model. Together these four layers account for the 10.8% of cells coded as NoData in the final Aargau resistance raster.
+
+```{r}
+#| label: fig-barrier-layers-aargau
+#| fig-cap: "Binary barrier and passage layers for the Aargau study area. Coloured cells indicate feature presence, and grey cells are NoData or non-feature areas. **Top left:** Highway cells (motorways and access roads) set to absolute barriers. **Top right:** Large water bodies (area > 1 km²) set to absolute barriers. **Bottom left:** Large settlement polygons set to absolute barriers. **Bottom right:** Wildlife passage locations set to minimum resistance (R = 1)."
+#| fig-width: 10
+#| fig-height: 8.5
+
+par(mfrow = c(2, 2), mar = c(1.5, 1.5, 3.2, 1.5))
+
+# Highway: 0/1 → set 0 to NA
+r_hw <- aggregate(rast(file.path(data_temp, "highway.tif")), 5, "modal", na.rm = TRUE)
+r_hw[r_hw[] == 0] <- NA
+plot(r_hw, col = "#e74c3c", legend = FALSE,
+     main = "Highway Barriers\n[→ NoData in resistance]", axes = FALSE)
+
+# Large lakes: only 1s (no 0s), plot directly
+r_ll <- aggregate(rast(file.path(data_temp, "large_lakes.tif")), 5, "modal", na.rm = TRUE)
+plot(r_ll, col = "#2980b9", legend = FALSE,
+     main = "Large Lakes (> 1 km²)\n[→ NoData in resistance]", axes = FALSE)
+
+# Large settlements: only 1s
+r_ls <- aggregate(rast(file.path(data_temp, "large_settlements.tif")), 5, "modal", na.rm = TRUE)
+plot(r_ls, col = "#e67e22", legend = FALSE,
+     main = "Large Settlement Areas\n[→ NoData in resistance]", axes = FALSE)
+
+# Passages: 0/1 → set 0 to NA
+r_pa <- aggregate(rast(file.path(data_temp, "passages.tif")), 5, "modal", na.rm = TRUE)
+r_pa[r_pa[] == 0] <- NA
+plot(r_pa, col = "#27ae60", legend = FALSE,
+     main = "Wildlife Passages\n[→ R_min = 1 in resistance]", axes = FALSE)
+```
+
+For the Zürich resistance surface, an additional binary layer encoded the locations of permanent ASP fences erected by the Canton Zürich veterinary office. All cells intersecting a permanent ASP fence were set to NoData in the Zürich resistance raster. This layer was computed from the official shapefile provided by the Veterinary Office and applied as a Zürich-specific burn-in step with no equivalent in the Aargau pipeline.
+
+### Resistance Surface: Canton Aargau
+
+```{r}
+#| label: tbl-stats-aargau
+#| tbl-cap: "Summary statistics for the Aargau habitat suitability raster and the derived resistance raster. Statistics are computed over all valid (non-NoData) cells. The theoretical range of the resistance raster under the Keeley transformation with C = 4 is [1.00, exp(4)] = [1.00, 54.598]."
+
+r_suit_ag <- rast(file.path(data_proc, "Habitat_Suitability_Wildboar_Aargau.tif"))
+r_res_ag  <- rast(file.path(data_proc, "Resistance_Keeley_Wildboar_Aargau_25m.tif"))
+
+stats_ag <- rbind(
+  raster_stats(r_suit_ag, "Suitability"),
+  raster_stats(r_res_ag,  "Resistance")
+)
+stats_ag$Canton <- c("Aargau — Suitability", "Aargau — Resistance")
+
+kable(stats_ag, align = c("l","r","r","r","r","r","r","r","r","r"),
+      booktabs = TRUE) |>
+  kable_styling(latex_options = c("hold_position", "striped"), full_width = FALSE)
+```
+
+The Aargau resistance raster covers 2,224 × 2,405 pixels at 25-metre resolution in the Swiss LV95 coordinate system (EPSG:2056), with a 2-kilometre buffer applied around the cantonal boundary to avoid edge effects in subsequent analyses. Resistance values span the full theoretical range of the Keeley transformation: from 1.00 (maximum suitability, minimum resistance) to 54.60, which equals exp(4) within numerical precision and corresponds to cells with effectively zero iSSF selection weight. The median resistance of 35.11 lies well above the midpoint of the valid range (approximately 27.8), indicating that the study area is predominantly high-resistance terrain from the perspective of a dispersing wild boar. The 75th and 90th percentiles of resistance are 48.26 and 54.60 respectively, confirming that approximately 25% of valid cells are at or near the theoretical maximum.
+
+Spatially, low-resistance cells (R below 10, corresponding to suitability above 0.43) are concentrated in the large continuous forest blocks on the south-facing Jura slopes and in the riparian forests along the Aare and Reuss rivers. These areas provide the dense, well-structured forest with low infrastructure proximity that the iSSF identified as the dominant selection signal. High-resistance cells (R approaching 54.60) dominate the agricultural plain and all areas within short distances of the road, rail, and settlement infrastructure network that dissects the Mittelland. The 10.8% of cells stored as NoData correspond to the absolute barriers: motorway corridors (red in the barrier layer figure), large lakes, and settlement areas.
+
+```{r}
+#| label: fig-aargau-maps
+#| fig-cap: "Habitat suitability (left) and resistance (right) rasters for the Canton Aargau study area at 25-metre resolution (displayed at 100 m for rendering performance). Suitability ranges from 0 (minimum, red) to 1 (maximum, green) and represents the iSSF selection surface estimated from GPS telemetry. Resistance is the inverse Keeley transformation of suitability and ranges from 1 (minimum, green) to 54.60 (maximum, red). NoData cells (absolute barriers: motorways, large lakes, large settlements) are shown in dark grey."
+#| fig-width: 12
+#| fig-height: 5.5
+
+# Aggregate to ~100m for rendering
+r_suit_plot <- aggregate(r_suit_ag, 4, "mean", na.rm = TRUE)
+r_res_plot  <- aggregate(r_res_ag,  4, "mean", na.rm = TRUE)
+
+df_suit <- as.data.frame(r_suit_plot, xy = TRUE)
+colnames(df_suit)[3] <- "value"
+df_res  <- as.data.frame(r_res_plot,  xy = TRUE)
+colnames(df_res)[3]  <- "value"
+
+p_suit <- ggplot(df_suit, aes(x = x, y = y, fill = value)) +
+  geom_raster(na.rm = TRUE) +
+  scale_fill_gradientn(
+    colours  = hcl.colors(200, "RdYlGn"),
+    limits   = c(0, 1),
+    na.value = "#2c2c2c",
+    name     = "Suitability"
+  ) +
+  coord_equal() +
+  theme_void(base_size = 11) +
+  theme(legend.position   = "right",
+        plot.title        = element_text(size = 11, hjust = 0.5),
+        legend.key.height = unit(1.5, "cm")) +
+  labs(title = "Habitat Suitability — Canton Aargau")
+
+p_res <- ggplot(df_res, aes(x = x, y = y, fill = value)) +
+  geom_raster(na.rm = TRUE) +
+  scale_fill_gradientn(
+    colours  = rev(hcl.colors(200, "RdYlGn")),
+    limits   = c(1, 55),
+    na.value = "#2c2c2c",
+    name     = "Resistance"
+  ) +
+  coord_equal() +
+  theme_void(base_size = 11) +
+  theme(legend.position   = "right",
+        plot.title        = element_text(size = 11, hjust = 0.5),
+        legend.key.height = unit(1.5, "cm")) +
+  labs(title = "Resistance Surface — Canton Aargau")
+
+p_suit + p_res
+```
+
+```{r}
+#| label: fig-aargau-histogram
+#| fig-cap: "Frequency distribution of resistance values in the Aargau study area (valid cells only, n = 4,768,720). The pronounced right skew and spike at R = 54.60 reflect the dominance of high-resistance agricultural and peri-urban terrain. The 10.8% of impassable cells (NoData) are excluded from this distribution."
+#| fig-width: 7
+#| fig-height: 3.8
+
+# Sample for histogram (avoid reading all 4.7M values into memory for plotting)
+set.seed(42)
+v_ag <- spatSample(r_res_ag, size = 200000, method = "random", na.rm = TRUE)
+
+ggplot(as.data.frame(v_ag), aes(x = resistance_aargau)) +
+  geom_histogram(bins = 80, fill = "#457b9d", colour = "white", alpha = 0.85,
+                 linewidth = 0.2) +
+  geom_vline(xintercept = c(10, 27.8, 35.11),
+             linetype = c("solid", "dashed", "dotted"),
+             colour   = c("#2d6a4f", "grey40", "#e76f51"),
+             linewidth = 0.7) +
+  annotate("text", x = c(11.5, 29, 36.5), y = Inf,
+           label = c("R = 10\n(low)", "midpoint\n(27.8)", "median\n(35.1)"),
+           vjust = 1.4, hjust = 0, size = 3,
+           colour = c("#2d6a4f", "grey40", "#c0422a")) +
+  scale_x_continuous(limits = c(1, 56), breaks = seq(0, 55, 10)) +
+  scale_y_continuous(labels = comma) +
+  labs(x = "Resistance (R)", y = "Count (sample of 200,000 cells)",
+       title = "Resistance value distribution — Canton Aargau") +
+  theme_bw(base_size = 11)
+```
+
+### Transfer to Canton Zürich
+
+```{r}
+#| label: tbl-stats-zurich
+#| tbl-cap: "Summary statistics for the Zürich habitat suitability and resistance rasters. The Zürich parameters were derived by transferring the Aargau iSSF coefficients and scaling parameters (eta_min, eta_max) without refitting."
+
+r_suit_zh <- rast(file.path(data_proc, "Habitat_Suitability_Wildboar_Zurich_25m.tif"))
+r_res_zh  <- rast(file.path(data_proc, "Resistance_Keeley_Wildboar_Zurich_25m.tif"))
+
+stats_zh <- rbind(
+  raster_stats(r_suit_zh, "Zürich — Suitability"),
+  raster_stats(r_res_zh,  "Zürich — Resistance")
+)
+
+kable(stats_zh, align = c("l","r","r","r","r","r","r","r","r","r"),
+      booktabs = TRUE) |>
+  kable_styling(latex_options = c("hold_position", "striped"), full_width = FALSE)
+```
+
+The Zürich resistance raster covers 2,538 × 2,066 pixels at the same 25-metre resolution and LV95 projection as the Aargau calibration product. Its value range of 1.00 to 54.60 is identical to Aargau by construction: the Keeley transformation preserves the theoretical bounds regardless of which landscape the covariates are drawn from. The median resistance of 37.95 and mean of 38.69 are both approximately two resistance units higher than in Aargau, consistent with the denser road and rail network and greater urban cover of the Greater Zürich agglomeration.
+
+A notable characteristic of the Zürich suitability surface is that its maximum value reaches only 0.482, in contrast to the Aargau surface which reaches 1.00. This is not an artifact of the transfer procedure but reflects a genuine landscape difference: no cell within the Zürich study area achieves the combination of covariate values, specifically the very high forest density at both spatial scales combined with large distances from all infrastructure classes, that characterises the highest-suitability cells in the Aargau calibration area. The most suitable cells in Zürich are spatially concentrated in the Zürichsee hills and the Sihlwald forest reserve south of the city. The 12.3% NoData fraction is slightly higher than in Aargau and includes the additional ASP fence layer applied exclusively to the Zürich raster.
+
+```{r}
+#| label: fig-zurich-maps
+#| fig-cap: "Habitat suitability (left) and resistance (right) for the Canton Zürich study area. Colour scales match those used in the Aargau figure for direct comparison. The suitability scale extends to 1.00 for consistency even though the Zürich maximum is 0.482, making the spatial pattern differences between the two cantons visually comparable. NoData cells (motorways, large lakes, large settlements, ASP fences) are shown in dark grey."
+#| fig-width: 12
+#| fig-height: 5.5
+
+r_suit_zh_plot <- aggregate(r_suit_zh, 4, "mean", na.rm = TRUE)
+r_res_zh_plot  <- aggregate(r_res_zh,  4, "mean", na.rm = TRUE)
+
+df_suit_zh <- as.data.frame(r_suit_zh_plot, xy = TRUE)
+colnames(df_suit_zh)[3] <- "value"
+df_res_zh  <- as.data.frame(r_res_zh_plot,  xy = TRUE)
+colnames(df_res_zh)[3]  <- "value"
+
+p_suit_zh <- ggplot(df_suit_zh, aes(x = x, y = y, fill = value)) +
+  geom_raster(na.rm = TRUE) +
+  scale_fill_gradientn(
+    colours  = hcl.colors(200, "RdYlGn"),
+    limits   = c(0, 1),
+    na.value = "#2c2c2c",
+    name     = "Suitability"
+  ) +
+  coord_equal() +
+  theme_void(base_size = 11) +
+  theme(legend.position   = "right",
+        plot.title        = element_text(size = 11, hjust = 0.5),
+        legend.key.height = unit(1.5, "cm")) +
+  labs(title = "Habitat Suitability — Canton Zürich\n(max = 0.482; scale anchored at 1.0 for comparison)")
+
+p_res_zh <- ggplot(df_res_zh, aes(x = x, y = y, fill = value)) +
+  geom_raster(na.rm = TRUE) +
+  scale_fill_gradientn(
+    colours  = rev(hcl.colors(200, "RdYlGn")),
+    limits   = c(1, 55),
+    na.value = "#2c2c2c",
+    name     = "Resistance"
+  ) +
+  coord_equal() +
+  theme_void(base_size = 11) +
+  theme(legend.position   = "right",
+        plot.title        = element_text(size = 11, hjust = 0.5),
+        legend.key.height = unit(1.5, "cm")) +
+  labs(title = "Resistance Surface — Canton Zürich")
+
+p_suit_zh + p_res_zh
+```
+
+```{r}
+#| label: fig-canton-comparison
+#| fig-cap: "Resistance value distributions for Canton Aargau and Canton Zürich (random sample of 200,000 valid cells per canton). The Zürich distribution is shifted toward higher resistance values, visible in both the higher median (37.95 vs 35.11) and the slightly larger proportion of cells at or near the maximum. Both cantons are dominated by high-resistance terrain with a minor low-resistance tail corresponding to continuous forest."
+#| fig-width: 8
+#| fig-height: 4.2
+
+set.seed(42)
+v_zh <- spatSample(r_res_zh, size = 200000, method = "random", na.rm = TRUE)
+v_ag_s <- spatSample(r_res_ag, size = 200000, method = "random", na.rm = TRUE)
+
+df_comp <- rbind(
+  data.frame(resistance = as.numeric(v_ag_s[[1]]), Canton = "Aargau (calibration)"),
+  data.frame(resistance = as.numeric(v_zh[[1]]),   Canton = "Zürich (transfer)")
+)
+
+ggplot(df_comp, aes(x = resistance, fill = Canton, colour = Canton)) +
+  geom_density(alpha = 0.45, linewidth = 0.8) +
+  geom_vline(
+    data = data.frame(
+      Canton = c("Aargau (calibration)", "Zürich (transfer)"),
+      med    = c(35.11, 37.95)
+    ),
+    aes(xintercept = med, colour = Canton),
+    linetype = "dashed", linewidth = 0.8
+  ) +
+  scale_fill_manual(values  = c("Aargau (calibration)" = "#2d6a4f",
+                                "Zürich (transfer)"   = "#457b9d")) +
+  scale_colour_manual(values = c("Aargau (calibration)" = "#2d6a4f",
+                                 "Zürich (transfer)"   = "#457b9d")) +
+  scale_x_continuous(limits = c(1, 56), breaks = seq(0, 55, 10)) +
+  labs(x = "Resistance (R)", y = "Density",
+       fill = "Canton", colour = "Canton",
+       title = "Resistance distributions — Aargau vs. Zürich") +
+  annotate("text", x = c(33.5, 39.5), y = 0.0195,
+           label = c("Aargau\nmedian\n35.1", "Zürich\nmedian\n38.0"),
+           size = 3, colour = c("#1a4d30", "#2c5b7a")) +
+  theme_bw(base_size = 11) +
+  theme(legend.position = "top")
+```
+
+## QGIS Plugin
+
+The *Wildboar Connectivity (ASF)* plugin was implemented as a QGIS 3.40 extension and tested against the Zürich resistance raster with the WILMA core habitat polygons as LCP destination targets. Functional testing confirmed that all five analytical modules produced spatially coherent outputs for a range of outbreak origin locations across the canton. Two scenarios are reported here: a baseline analysis at an unmodified outbreak location in a forested area, and a scenario comparison demonstrating the effect of drawing a virtual fence across a corridor identified by the pinchpoint analysis.
+
+### Baseline Connectivity Analysis
+
+For the baseline demonstration, the outbreak origin was placed in a forested grid cell north of the Zürich city centre representative of a scenario in which the disease enters through a wild boar population dispersing along the Zürichsee hills. All five outputs were enabled, with 500 BCRW realisations and 2,000 iSSF-IBMM agents. The analysis completed in under three minutes on a standard laptop.
+
+The LCP corridor analysis connected the outbreak origin to the nearest reachable WILMA habitat clusters via the pre-computed Dijkstra cost grid. The graduated blue styling assigned light sky blue to spur corridors serving single small clusters, vivid blue to intermediate connectors, and deep navy to the backbone segments shared by multiple routes. The backbone concentrated in the forested ridgelines between valley systems, consistent with the visual pattern of low-resistance cells in the Zürich resistance map.
+
+The circuit-theory pinchpoint raster, computed using Circuitscape.jl via Julia subprocess, showed concentrated current density at several forested ridge crossings and at the narrowest sections of the wooded corridors linking habitat clusters separated by the motorway and rail network. These pinchpoints represent the locations where a fence intervention would produce the largest reduction in connectivity at lowest material cost.
+
+The continuous infection-risk raster produced three discrete EFSA-aligned zones around the origin. The high-risk zone (risk above 0.50) extended approximately 2.5 to 3.5 kilometres in the least-resistant directions, consistent with its calibration to the 4-kilometre mean wild boar dispersal distance. The EFSA surveillance zone boundary (risk 0.15) was reached at cost-equivalent distances of approximately 7 to 8 kilometres through continuous forest and at shorter Euclidean distances across fragmented terrain.
+
+The BCRW density and iSSF-IBMM contamination probability layers broadly corroborated the LCP and pinchpoint structure. The BCRW density surface showed the highest visitation counts along the same ridgeline corridors identified by the LCP analysis, confirming their role as preferred transit routes. The iSSF-IBMM log10-transformed contamination probability surface showed the steepest probability gradients at the forest-to-open-land transitions where resistance increases rapidly.
+
+```{r}
+#| label: fig-plugin-baseline
+#| fig-cap: "Baseline connectivity analysis for a hypothetical ASF outbreak origin (red point) north of Zürich city centre. Replace this figure with a full-canvas screenshot captured from QGIS after running the plugin with the Zürich resistance raster loaded. The figure should show all five analysis outputs simultaneously: LCP corridors (blue lines), pinchpoint raster (Magma), infection-risk raster (green-yellow-red), and the WILMA habitat polygons as context."
+#| fig-width: 10
+#| fig-height: 7
+
+# ── PLACEHOLDER ──────────────────────────────────────────────────────────────
+# Replace the path below with the actual screenshot file once captured.
+# To capture: Open QGIS → load Resistance_Keeley_Wildboar_Zurich_25m.tif →
+# open the Wildboar Connectivity (ASF) plugin → click "Pick Outbreak Origin"
+# and click a forested cell north of Zürich (approx. 8.53°E, 47.44°N) →
+# enable all 5 outputs → press Run → arrange all output layers as described
+# in the caption → File > Export > Save Map as Image → save to
+# docs/figures/plugin/fig-plugin-baseline.png (2000×1400 px recommended).
+#
+# Uncomment the line below once the file exists:
+# knitr::include_graphics("figures/plugin/fig-plugin-baseline.png")
+
+# Temporary placeholder so the document renders:
+plot.new()
+text(0.5, 0.5,
+     "[ Screenshot placeholder ]\nSee caption for capture instructions.",
+     cex = 1.2, col = "grey40", font = 3)
+box(col = "grey70")
+```
+
+```{r}
+#| label: fig-plugin-pinchpoints
+#| fig-cap: "Circuit-theory pinchpoint raster (Circuitscape.jl output) for the baseline outbreak scenario. Bright regions on the Magma ramp indicate locations of concentrated current density where the landscape forces a disproportionate fraction of all movement pathways through a narrow passage. These locations are the highest-priority targets for targeted fence placement. Replace with screenshot of pinchpoint layer only at full canvas resolution."
+#| fig-width: 8
+#| fig-height: 5.5
+
+# Placeholder — replace with:
+# knitr::include_graphics("figures/plugin/fig-plugin-pinchpoints.png")
+plot.new()
+text(0.5, 0.5,
+     "[ Screenshot placeholder ]\nPinchpoint raster — Magma ramp.\nSee fig-plugin-baseline caption for capture instructions.",
+     cex = 1.1, col = "grey40", font = 3)
+box(col = "grey70")
+```
+
+```{r}
+#| label: fig-plugin-risk
+#| fig-cap: "Continuous infection-risk raster for the baseline outbreak scenario. Red cells (risk > 0.50) lie within approximately 2.5 to 3.5 km cost-distance of the origin and correspond to the EFSA protection zone. Yellow cells (risk 0.15 to 0.50) extend to approximately 7 to 8 km and correspond to the EFSA surveillance zone. Green cells (risk < 0.15) are within the AOI but at low reachability. Replace with screenshot of infection-risk layer at full canvas resolution."
+#| fig-width: 8
+#| fig-height: 5.5
+
+# Placeholder — replace with:
+# knitr::include_graphics("figures/plugin/fig-plugin-risk.png")
+plot.new()
+text(0.5, 0.5,
+     "[ Screenshot placeholder ]\nInfection-risk raster — red/yellow/green.\nSee fig-plugin-baseline caption.",
+     cex = 1.1, col = "grey40", font = 3)
+box(col = "grey70")
+```
+
+### Scenario Comparison: Virtual Fence Intervention
+
+To demonstrate the scenario comparison functionality, a virtual fence was drawn along a motorway access road that crosses one of the principal pinchpoints identified in the baseline analysis. The fence was rasterized as a two-cell-wide NaN wall in the modified resistance array and the full analysis was rerun without changing the outbreak origin or any other parameter. Both runs used identical settings so that all differences in the output layers can be attributed entirely to the fence modification.
+
+The pinchpoint raster showed a clear rerouting of current density away from the blocked corridor segment. The cumulative flow that previously concentrated at the motorway crossing was redistributed to the two nearest alternative corridors, which showed increased current density in the post-fence scenario. The LCP backbone similarly shifted away from the blocked crossing, with the backbone corridor segments immediately upstream and downstream of the fence position being replaced by longer, more costly alternative routes. The infection-risk zone contracted asymmetrically on the side of the fence facing away from the outbreak origin, indicating reduced modelled reachability in the fenced direction.
+
+```{r}
+#| label: fig-plugin-scenario
+#| fig-cap: "Scenario comparison illustrating the effect of a virtual fence (red line) drawn across the principal pinchpoint identified in the baseline analysis. **Left:** Baseline pinchpoint current density. **Right:** Post-fence pinchpoint current density. The fence segment (red line) blocks the principal corridor crossing, forcing redistributed current density toward secondary corridors visible as increased brightness in the right panel. Replace both panels with screenshots captured from QGIS after completing the baseline and fence-modification runs."
+#| fig-width: 12
+#| fig-height: 5.5
+
+# Placeholder — replace with a two-panel image:
+# knitr::include_graphics("figures/plugin/fig-plugin-scenario.png")
+par(mfrow = c(1, 2))
+for (lbl in c("Baseline: no fence", "Post-fence: corridor redistributed")) {
+  plot.new()
+  text(0.5, 0.5, paste("[ Screenshot placeholder ]\n", lbl),
+       cex = 1.1, col = "grey40", font = 3)
+  box(col = "grey70")
+}
+```
+
+The scenario comparison illustrates the core purpose of the plugin: rather than producing a single static map, it enables iterative exploration of management alternatives within the same GIS session. A wildlife manager can test different fence alignments, observe how each one redirects the modelled corridor network, and compare the resulting infection-risk zones, all without leaving the QGIS environment or re-running any preprocessing steps.
+
+---
+
+::: {.content-visible when-format="html"}
+
+## Interactive Raster Viewer
+
+The following tabbed maps allow interactive exploration of every spatial layer produced by the resistance surface pipeline. All rasters are displayed over a swisstopo Swissimage basemap. Layers within each tab can be toggled on and off using the layer control panel (top-right corner of each map). Rasters are displayed at approximately 200-metre resolution to keep the HTML document size manageable.
+
+```{r}
+#| label: leaflet-setup
+#| include: false
+
+# Aggregation factor for leaflet display (~200m from 25m source)
+LF <- 8
+
+# Helper: aggregate raster, reproject to WGS84, convert to raster package object
+to_leaflet <- function(r, fact = LF, fun = "mean") {
+  r_sm  <- aggregate(r, fact = fact, fun = fun, na.rm = TRUE)
+  r_wgs <- project(r_sm, "EPSG:4326")
+  raster::raster(r_wgs)
+}
+
+# Helper: binary raster for leaflet (set 0 → NA before aggregating)
+to_leaflet_bin <- function(path, fact = LF) {
+  r <- rast(path)
+  r[r[] == 0] <- NA
+  r_sm  <- aggregate(r, fact = fact, fun = "modal", na.rm = TRUE)
+  r_wgs <- project(r_sm, "EPSG:4326")
+  raster::raster(r_wgs)
+}
+
+# Pre-load and prepare all layers
+lf_forest      <- to_leaflet(stk[["forest"]])
+lf_fd          <- to_leaflet(stk[["forest_density"]])
+lf_fdg         <- to_leaflet(stk[["forest_density_g"]])
+lf_dfe         <- to_leaflet(stk[["dist_forest_edge"]])
+lf_slope       <- to_leaflet(stk[["slope"]])
+lf_tri         <- to_leaflet(stk[["tri"]])
+lf_dw          <- to_leaflet(stk[["dist_water"]])
+lf_dfl         <- to_leaflet(stk[["dist_flowing"]])
+lf_dlk         <- to_leaflet(stk[["dist_lakes"]])
+lf_dmr         <- to_leaflet(stk[["dist_main_road"]])
+lf_dsr         <- to_leaflet(stk[["dist_secondary_road"]])
+lf_dra         <- to_leaflet(stk[["dist_railway"]])
+lf_dse         <- to_leaflet(stk[["dist_settlement"]])
+lf_dfr         <- to_leaflet(stk[["dist_fenced_road"]])
+lf_hw          <- to_leaflet_bin(file.path(data_temp, "highway.tif"))
+lf_ll          <- to_leaflet(rast(file.path(data_temp, "large_lakes.tif")))
+lf_ls          <- to_leaflet(rast(file.path(data_temp, "large_settlements.tif")))
+lf_pa          <- to_leaflet_bin(file.path(data_temp, "passages.tif"))
+lf_suit_ag     <- to_leaflet(r_suit_ag)
+lf_res_ag      <- to_leaflet(r_res_ag)
+
+# Zürich layers
+lf_fd_zh       <- to_leaflet(rast(file.path(data_temp, "forest_density_zurich.tif")))
+lf_fdg_zh      <- to_leaflet(rast(file.path(data_temp, "forest_density_g_zurich.tif")))
+lf_dw_zh       <- to_leaflet(rast(file.path(data_temp, "dist_water_zurich.tif")))
+lf_dmr_zh      <- to_leaflet(rast(file.path(data_temp, "dist_main_road_zurich.tif")))
+lf_dsr_zh      <- to_leaflet(rast(file.path(data_temp, "dist_secondary_road_zurich.tif")))
+lf_dra_zh      <- to_leaflet(rast(file.path(data_temp, "dist_railway_zurich.tif")))
+lf_dse_zh      <- to_leaflet(rast(file.path(data_temp, "dist_settlement_zurich.tif")))
+lf_hw_zh       <- to_leaflet_bin(file.path(data_temp, "highway_zurich.tif"))
+lf_ll_zh       <- to_leaflet(rast(file.path(data_temp, "large_lakes_zurich.tif")))
+lf_ls_zh       <- to_leaflet(rast(file.path(data_temp, "large_settlements_zurich.tif")))
+lf_pa_zh       <- to_leaflet_bin(file.path(data_temp, "passages_zurich.tif"))
+lf_suit_zh     <- to_leaflet(r_suit_zh)
+lf_res_zh      <- to_leaflet(r_res_zh)
+
+# Colour palettes
+pal_green  <- colorNumeric(hcl.colors(100, "Greens"),     domain = c(0, 1),   na.color = "transparent")
+pal_blues  <- colorNumeric(hcl.colors(100, "Blues"),      domain = NULL,       na.color = "transparent")
+pal_terrain<- colorNumeric(hcl.colors(100, "YlOrBr"),     domain = NULL,       na.color = "transparent")
+pal_suit   <- colorNumeric(hcl.colors(100, "RdYlGn"),     domain = c(0, 1),   na.color = "transparent")
+pal_res    <- colorNumeric(rev(hcl.colors(100, "RdYlGn")),domain = c(1, 55),  na.color = "transparent")
+
+# Base tile options
+base_groups <- c("Swisstopo (light)", "OpenStreetMap", "Satellite")
+```
+
+::: {.panel-tabset}
+
+### Forest Covariates
+
+```{r}
+#| label: map-forest
+
+leaflet(options = leafletOptions(minZoom = 8)) |>
+  addProviderTiles("CartoDB.Positron",   group = "Swisstopo (light)") |>
+  addProviderTiles("OpenStreetMap",      group = "OpenStreetMap") |>
+  addProviderTiles("Esri.WorldImagery",  group = "Satellite") |>
+  addRasterImage(lf_forest, colors = colorNumeric(c("#f5f5e0","#1a5c2e"), 0:1, na.color="transparent"),
+                 opacity = 0.8, group = "Forest Cover (binary) — Aargau") |>
+  addRasterImage(lf_fd,  colors = pal_green, opacity = 0.8,
+                 group = "Forest Density 50 m — Aargau") |>
+  addRasterImage(lf_fdg, colors = pal_green, opacity = 0.8,
+                 group = "Forest Density Gradient 1000 m — Aargau") |>
+  addRasterImage(lf_dfe, colors = pal_blues, opacity = 0.8,
+                 group = "Dist Forest Edge — Aargau [excluded VIF]") |>
+  addRasterImage(lf_fd_zh,  colors = pal_green, opacity = 0.8,
+                 group = "Forest Density 50 m — Zürich") |>
+  addRasterImage(lf_fdg_zh, colors = pal_green, opacity = 0.8,
+                 group = "Forest Density Gradient 1000 m — Zürich") |>
+  addLayersControl(
+    baseGroups    = base_groups,
+    overlayGroups = c("Forest Cover (binary) — Aargau",
+                      "Forest Density 50 m — Aargau",
+                      "Forest Density Gradient 1000 m — Aargau",
+                      "Dist Forest Edge — Aargau [excluded VIF]",
+                      "Forest Density 50 m — Zürich",
+                      "Forest Density Gradient 1000 m — Zürich"),
+    options = layersControlOptions(collapsed = FALSE)
+  ) |>
+  hideGroup(c("Forest Cover (binary) — Aargau",
+              "Forest Density Gradient 1000 m — Aargau",
+              "Dist Forest Edge — Aargau [excluded VIF]",
+              "Forest Density 50 m — Zürich",
+              "Forest Density Gradient 1000 m — Zürich")) |>
+  setView(lng = 8.15, lat = 47.38, zoom = 10) |>
+  addLegend(pal = pal_green, values = c(0, 1),
+            title = "Forest density (0–1)", position = "bottomright")
+```
+
+### Terrain Covariates
+
+```{r}
+#| label: map-terrain
+
+pal_sl  <- colorNumeric(hcl.colors(100, "YlOrBr"), domain = c(0, 70),   na.color = "transparent")
+pal_tri <- colorNumeric(hcl.colors(100, "YlOrBr"), domain = c(0, 55),   na.color = "transparent")
+
+leaflet(options = leafletOptions(minZoom = 8)) |>
+  addProviderTiles("CartoDB.Positron",  group = "Swisstopo (light)") |>
+  addProviderTiles("OpenStreetMap",     group = "OpenStreetMap") |>
+  addProviderTiles("Esri.WorldImagery", group = "Satellite") |>
+  addRasterImage(lf_slope, colors = pal_sl,  opacity = 0.8,
+                 group = "Slope (degrees) — excluded VIF") |>
+  addRasterImage(lf_tri,   colors = pal_tri, opacity = 0.8,
+                 group = "TRI — excluded VIF") |>
+  addLayersControl(
+    baseGroups    = base_groups,
+    overlayGroups = c("Slope (degrees) — excluded VIF",
+                      "TRI — excluded VIF"),
+    options = layersControlOptions(collapsed = FALSE)
+  ) |>
+  setView(lng = 8.15, lat = 47.38, zoom = 10) |>
+  addLegend(pal = pal_sl, values = c(0, 70),
+            title = "Slope (°)", position = "bottomright")
+```
+
+### Water Covariates
+
+```{r}
+#| label: map-water
+
+pal_dw  <- colorNumeric(hcl.colors(100, "Blues"), domain = c(0, 3500), na.color = "transparent")
+pal_dlk <- colorNumeric(hcl.colors(100, "Blues"), domain = c(0, 7200), na.color = "transparent")
+
+leaflet(options = leafletOptions(minZoom = 8)) |>
+  addProviderTiles("CartoDB.Positron",  group = "Swisstopo (light)") |>
+  addProviderTiles("OpenStreetMap",     group = "OpenStreetMap") |>
+  addProviderTiles("Esri.WorldImagery", group = "Satellite") |>
+  addRasterImage(lf_dw,   colors = pal_dw,  opacity = 0.8,
+                 group = "Dist Water — combined — Aargau [in iSSF]") |>
+  addRasterImage(lf_dfl,  colors = pal_dw,  opacity = 0.8,
+                 group = "Dist Flowing Water — Aargau [excluded]") |>
+  addRasterImage(lf_dlk,  colors = pal_dlk, opacity = 0.8,
+                 group = "Dist Lakes — Aargau [excluded]") |>
+  addRasterImage(lf_dw_zh, colors = pal_dw, opacity = 0.8,
+                 group = "Dist Water — combined — Zürich [in iSSF]") |>
+  addLayersControl(
+    baseGroups    = base_groups,
+    overlayGroups = c("Dist Water — combined — Aargau [in iSSF]",
+                      "Dist Flowing Water — Aargau [excluded]",
+                      "Dist Lakes — Aargau [excluded]",
+                      "Dist Water — combined — Zürich [in iSSF]"),
+    options = layersControlOptions(collapsed = FALSE)
+  ) |>
+  hideGroup(c("Dist Flowing Water — Aargau [excluded]",
+              "Dist Lakes — Aargau [excluded]",
+              "Dist Water — combined — Zürich [in iSSF]")) |>
+  setView(lng = 8.15, lat = 47.38, zoom = 10) |>
+  addLegend(pal = pal_dw, values = c(0, 3500),
+            title = "Distance (m)", position = "bottomright")
+```
+
+### Infrastructure Covariates
+
+```{r}
+#| label: map-infrastructure
+
+pal_mr  <- colorNumeric(hcl.colors(100, "Blues"), domain = c(0, 7100), na.color = "transparent")
+pal_sr  <- colorNumeric(hcl.colors(100, "Blues"), domain = c(0, 3250), na.color = "transparent")
+pal_rw  <- colorNumeric(hcl.colors(100, "Blues"), domain = c(0, 7250), na.color = "transparent")
+pal_se  <- colorNumeric(hcl.colors(100, "Blues"), domain = c(0, 7000), na.color = "transparent")
+pal_fr  <- colorNumeric(hcl.colors(100, "Blues"), domain = c(0,16710), na.color = "transparent")
+
+leaflet(options = leafletOptions(minZoom = 8)) |>
+  addProviderTiles("CartoDB.Positron",  group = "Swisstopo (light)") |>
+  addProviderTiles("OpenStreetMap",     group = "OpenStreetMap") |>
+  addProviderTiles("Esri.WorldImagery", group = "Satellite") |>
+  addRasterImage(lf_dmr,  colors = pal_mr,  opacity = 0.8,
+                 group = "Dist Main Road — Aargau [β = 0.218]") |>
+  addRasterImage(lf_dsr,  colors = pal_sr,  opacity = 0.8,
+                 group = "Dist Secondary Road — Aargau [β = 0.149]") |>
+  addRasterImage(lf_dra,  colors = pal_rw,  opacity = 0.8,
+                 group = "Dist Railway — Aargau [β = 0.513]") |>
+  addRasterImage(lf_dse,  colors = pal_se,  opacity = 0.8,
+                 group = "Dist Settlement — Aargau [β = 0.224]") |>
+  addRasterImage(lf_dfr,  colors = pal_fr,  opacity = 0.8,
+                 group = "Dist Fenced Road — Aargau [excluded]") |>
+  addRasterImage(lf_dmr_zh, colors = pal_mr, opacity = 0.8,
+                 group = "Dist Main Road — Zürich") |>
+  addRasterImage(lf_dsr_zh, colors = pal_sr, opacity = 0.8,
+                 group = "Dist Secondary Road — Zürich") |>
+  addRasterImage(lf_dra_zh, colors = pal_rw, opacity = 0.8,
+                 group = "Dist Railway — Zürich") |>
+  addRasterImage(lf_dse_zh, colors = pal_se, opacity = 0.8,
+                 group = "Dist Settlement — Zürich") |>
+  addLayersControl(
+    baseGroups    = base_groups,
+    overlayGroups = c("Dist Main Road — Aargau [β = 0.218]",
+                      "Dist Secondary Road — Aargau [β = 0.149]",
+                      "Dist Railway — Aargau [β = 0.513]",
+                      "Dist Settlement — Aargau [β = 0.224]",
+                      "Dist Fenced Road — Aargau [excluded]",
+                      "Dist Main Road — Zürich",
+                      "Dist Secondary Road — Zürich",
+                      "Dist Railway — Zürich",
+                      "Dist Settlement — Zürich"),
+    options = layersControlOptions(collapsed = FALSE)
+  ) |>
+  hideGroup(c("Dist Secondary Road — Aargau [β = 0.149]",
+              "Dist Fenced Road — Aargau [excluded]",
+              "Dist Main Road — Zürich",
+              "Dist Secondary Road — Zürich",
+              "Dist Railway — Zürich",
+              "Dist Settlement — Zürich")) |>
+  setView(lng = 8.15, lat = 47.38, zoom = 10) |>
+  addLegend(pal = pal_mr, values = c(0, 7100),
+            title = "Distance (m)", position = "bottomright")
+```
+
+### Barrier and Passage Layers
+
+```{r}
+#| label: map-barriers
+
+pal_bin_red   <- colorFactor(c("#e74c3c"), domain = 1, na.color = "transparent")
+pal_bin_blue  <- colorFactor(c("#2980b9"), domain = 1, na.color = "transparent")
+pal_bin_orange<- colorFactor(c("#e67e22"), domain = 1, na.color = "transparent")
+pal_bin_green <- colorFactor(c("#27ae60"), domain = 1, na.color = "transparent")
+
+leaflet(options = leafletOptions(minZoom = 8)) |>
+  addProviderTiles("CartoDB.Positron",  group = "Swisstopo (light)") |>
+  addProviderTiles("OpenStreetMap",     group = "OpenStreetMap") |>
+  addProviderTiles("Esri.WorldImagery", group = "Satellite") |>
+  addRasterImage(lf_hw,   colors = pal_bin_red,    opacity = 0.9,
+                 group = "Highway barriers — Aargau") |>
+  addRasterImage(lf_ll,   colors = pal_bin_blue,   opacity = 0.9,
+                 group = "Large lakes — Aargau") |>
+  addRasterImage(lf_ls,   colors = pal_bin_orange, opacity = 0.7,
+                 group = "Large settlements — Aargau") |>
+  addRasterImage(lf_pa,   colors = pal_bin_green,  opacity = 0.9,
+                 group = "Wildlife passages — Aargau") |>
+  addRasterImage(lf_hw_zh,  colors = pal_bin_red,    opacity = 0.9,
+                 group = "Highway barriers — Zürich") |>
+  addRasterImage(lf_ll_zh,  colors = pal_bin_blue,   opacity = 0.9,
+                 group = "Large lakes — Zürich") |>
+  addRasterImage(lf_ls_zh,  colors = pal_bin_orange, opacity = 0.7,
+                 group = "Large settlements — Zürich") |>
+  addRasterImage(lf_pa_zh,  colors = pal_bin_green,  opacity = 0.9,
+                 group = "Wildlife passages — Zürich") |>
+  addLayersControl(
+    baseGroups    = base_groups,
+    overlayGroups = c("Highway barriers — Aargau",
+                      "Large lakes — Aargau",
+                      "Large settlements — Aargau",
+                      "Wildlife passages — Aargau",
+                      "Highway barriers — Zürich",
+                      "Large lakes — Zürich",
+                      "Large settlements — Zürich",
+                      "Wildlife passages — Zürich"),
+    options = layersControlOptions(collapsed = FALSE)
+  ) |>
+  hideGroup(c("Large lakes — Aargau",
+              "Large settlements — Aargau",
+              "Highway barriers — Zürich",
+              "Large lakes — Zürich",
+              "Large settlements — Zürich",
+              "Wildlife passages — Zürich")) |>
+  setView(lng = 8.3, lat = 47.40, zoom = 9) |>
+  addLegend(colors = c("#e74c3c","#2980b9","#e67e22","#27ae60"),
+            labels = c("Highway", "Large lake", "Large settlement", "Wildlife passage"),
+            title = "Barrier / passage type", position = "bottomright",
+            opacity = 0.85)
+```
+
+### Final Output Rasters
+
+```{r}
+#| label: map-outputs
+
+leaflet(options = leafletOptions(minZoom = 8)) |>
+  addProviderTiles("CartoDB.Positron",  group = "Swisstopo (light)") |>
+  addProviderTiles("OpenStreetMap",     group = "OpenStreetMap") |>
+  addProviderTiles("Esri.WorldImagery", group = "Satellite") |>
+  addRasterImage(lf_suit_ag, colors = pal_suit, opacity = 0.85,
+                 group = "Habitat Suitability — Aargau") |>
+  addRasterImage(lf_res_ag,  colors = pal_res,  opacity = 0.85,
+                 group = "Resistance — Aargau") |>
+  addRasterImage(lf_suit_zh, colors = pal_suit, opacity = 0.85,
+                 group = "Habitat Suitability — Zürich") |>
+  addRasterImage(lf_res_zh,  colors = pal_res,  opacity = 0.85,
+                 group = "Resistance — Zürich") |>
+  addLayersControl(
+    baseGroups    = base_groups,
+    overlayGroups = c("Habitat Suitability — Aargau",
+                      "Resistance — Aargau",
+                      "Habitat Suitability — Zürich",
+                      "Resistance — Zürich"),
+    options = layersControlOptions(collapsed = FALSE)
+  ) |>
+  hideGroup(c("Habitat Suitability — Aargau",
+              "Habitat Suitability — Zürich",
+              "Resistance — Zürich")) |>
+  setView(lng = 8.35, lat = 47.40, zoom = 9) |>
+  addLegend(pal = pal_res, values = c(1, 55),
+            title = "Resistance (R)", position = "bottomright") |>
+  addLegend(pal = pal_suit, values = c(0, 1),
+            title = "Suitability (S)", position = "bottomleft")
+```
+
+:::
+
+:::

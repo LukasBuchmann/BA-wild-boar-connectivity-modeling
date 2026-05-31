@@ -1,0 +1,19 @@
+# Statement of Reproducibility {#sec-reproducibility}
+
+This thesis follows the FAIR principles for data and code management specified in the ZHAW Statement of Reproducibility.
+
+## Code and Workflow
+
+The complete analytical workflow is encoded in two Quarto notebooks. The resistance surface pipeline, from raw telemetry to the final 25-metre resistance raster, is contained in `scripts/01_create_resistance_surface.ipynb`. All connectivity analyses are contained in `scripts/02_connectivity.ipynb`. Given the same input data and software environment, both notebooks produce identical outputs deterministically. The QGIS plugin *Wildboar Connectivity (ASF)* is distributed as a standard QGIS Python package with a `metadata.txt` manifest and can be installed through the QGIS plugin manager.
+
+## Software Environment
+
+The ecological algorithm was developed in R 4.5.1 using `terra` 1.9.11, `sf` 1.1.0, `amt` 0.3.1.0, `survival` 3.8.3, `broom` 1.0.10, `car`, and the tidyverse packages `dplyr`, `tidyr`, `purrr`, and `lubridate`. The plugin was implemented for QGIS 3.40.13 in Python, with Circuitscape.jl invoked through a Julia subprocess and a scipy sparse fallback solver. [TO COMPLETE: insert the exact Python and Julia versions used.]
+
+## Directory Structure
+
+The project follows a standard structure with separate directories for raw, temporary, and processed data (`data/raw`, `data/temp`, `data/processed`). Each transformation step is documented in the commented notebooks above.
+
+## Data Availability
+
+All base geodata are drawn from publicly accessible Swiss federal services. The GPS telemetry and the permanent ASP fence shapefile were provided by the project partners and are not publicly redistributable. See @tbl-datasets in the data sources appendix for the full list of inputs and providers.

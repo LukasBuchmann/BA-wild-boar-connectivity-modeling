@@ -1,19 +1,17 @@
 # -*- coding: utf-8 -*-
 """
-Background QgsTask for the habitat-free ASF Wildboar Connectivity plugin.
+Background QgsTask for the ASF Wildboar Connectivity plugin.
 
-WORKFLOW (no core habitats needed):
+WORKFLOW:
 
-    Outbreak point  ->  one Dijkstra from the origin disc
-                    ->  cost-from-origin raster              (optional)
-                    ->  continuous infection-risk raster     (exp(-cost/scale))
-                    ->  one Circuit-theory solve             (origin -> AOI boundary)
-                          via Circuitscape.jl if available
-                          otherwise scipy.sparse fallback
-                    ->  optional random-walk visit density
-
-The AOI is determined automatically from the cost grid: cells with cost
-above a multiple of the median become unreachable (effectively walls).
+    Outbreak point  ->  small source disc (_point_source_cells)
+                    ->  Dijkstra from source disc
+                    ->  auto AOI  (all cells with finite cost)
+                    ->  infection-risk raster     exp(-cost/D_cost)
+                    ->  LCP corridors             to nearest low-resistance clusters
+                    ->  pinchpoint raster         Circuitscape.jl or scipy fallback
+                    ->  BCRW random-walk density  (optional)
+                    ->  iSSF-IBMM contamination   (optional)
 """
 
 import os
@@ -36,7 +34,6 @@ from qgis.core import (
     QgsGeometry,
     QgsMessageLog,
     QgsPointXY,
-    QgsProject,
     QgsRasterLayer,
     QgsTask,
     QgsVectorLayer,
@@ -1111,12 +1108,19 @@ class AsfConnectivityTask(QgsTask):
         """
         n_agents = int(self.options.get("n_agents", 2000))
 
-        # iSSF selection surface: w = 1/R.
-        # Low resistance = high habitat preference (the resistance surface
-        # was built by inverting the iSSF suitability, so inverting it
-        # back recovers the original selection weights).
+        # Recover habitat suitability S from resistance R using the exact
+        # inverse of the Keeley exponential transformation applied in
+        # scripts/01_create_resistance_surface.ipynb:
+        #
+        #   Forward:  R = exp(C * (1 - S))    C = 4
+        #   Inverse:  S = 1 - log(R) / C
+        #
+        # Range: R ∈ [1, exp(4)≈54.6]  →  S ∈ [1, 0]
+        # Impassable cells (NaN / negative) are set to S = 0.
+        KEELEY_C = 4.0
         finite_mask = np.isfinite(arr) & (arr > 0)
-        hs = np.where(finite_mask, 1.0 / arr, 0.0).astype(np.float64)
+        hs = np.where(finite_mask, 1.0 - np.log(arr) / KEELEY_C, 0.0)
+        hs = np.clip(hs, 0.0, 1.0).astype(np.float64)
 
         mean_ip_days = ASF_IP_GAMMA_SHAPE * ASF_IP_GAMMA_SCALE_DAYS
         mean_steps = int(round(mean_ip_days * ASF_ACTIVE_STEPS_PER_DAY))
@@ -1246,10 +1250,10 @@ class AsfConnectivityTask(QgsTask):
         # Continuous infection-risk raster
         if self.risk_raster_path:
             r = QgsRasterLayer(self.risk_raster_path,
-                               "Cumulative dispersal probability (resistant kernel)")
+                               "Infection risk (exponential decay function)")
             if r.isValid():
                 self._apply_risk_ramp(r)
-                add_wildboar_layer(r, ZOrder.SELECTED_HABITATS + 1)
+                add_wildboar_layer(r, ZOrder.RISK)
 
         # Biased Correlated Random Walk density
         if self.walk_raster_path:
@@ -1259,7 +1263,7 @@ class AsfConnectivityTask(QgsTask):
                 f"Random walk density (BCRW, n = {n})")
             if r.isValid():
                 self._apply_singleband_ramp(r, "Viridis")
-                add_wildboar_layer(r, ZOrder.PINCHPOINTS - 1)
+                add_wildboar_layer(r, ZOrder.WALK_DENSITY)
 
         # iSSF-IBMM contamination probability (log10-scaled)
         if self.ibmm_raster_path:
@@ -1370,7 +1374,7 @@ class AsfConnectivityTask(QgsTask):
         sym = layer.renderer().symbol()
         sym.setColor(QColor("#27ae60"))     # forest green
         sym.setSize(3.5)
-        add_wildboar_layer(layer, ZOrder.SELECTED_HABITATS)
+        add_wildboar_layer(layer, ZOrder.ANCHORS)
 
     # =================================================================
     # Renderers

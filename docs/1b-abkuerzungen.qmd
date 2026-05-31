@@ -1,0 +1,27 @@
+# List of Abbreviations {.unnumbered .unlisted}
+
+| Abbreviation | Meaning |
+|---|---|
+| AOI | Area of interest |
+| ASF | African Swine Fever |
+| ASFV | African Swine Fever virus |
+| ASP | Afrikanische Schweinepest (German for ASF) |
+| BCRW | Biased correlated random walk |
+| CRS | Coordinate reference system |
+| DHM25 | Digital Height Model 25 m (swisstopo) |
+| EFSA | European Food Safety Authority |
+| FAO | Food and Agriculture Organization of the United Nations |
+| FOEN | Federal Office for the Environment |
+| GPS | Global Positioning System |
+| IBMM | Individual-based movement model |
+| iSSF | Integrated step-selection function |
+| LCP | Least-cost path |
+| LV95 / LV03 | Swiss coordinate reference systems (EPSG:2056 / EPSG:21781) |
+| OIE / WOAH | World Organisation for Animal Health |
+| QGIS | Quantum GIS |
+| TRI | Terrain Ruggedness Index |
+| VIF | Variance inflation factor |
+| WILMA | Wildlife Management Research Group, ZHAW |
+| WKT | Well-Known Text |
+
+: List of abbreviations used in this thesis. {.striped}

@@ -1,125 +1,100 @@
-# Wildboar Connectivity v2 (QGIS plugin)
+# Wildboar Connectivity (ASF) — QGIS Plugin
 
-Local-scale habitat connectivity for wild boar: pick **one point on the
-map**, the plugin defines a circular movement neighbourhood around it,
-finds every core habitat in that circle, and computes pairwise LCPs, a
-cumulative Circuitscape pinchpoint map, and a network graph with
-centrality scores.
+Decision-support tool for African Swine Fever (ASF) spread modelling. No
+habitat polygons required — just a resistance raster and a single click.
 
 ## Workflow
 
-1. Load `Potenzial_Wildschwein_Kerneinstaende_ZH_2024_WILMA.shp` and your
-   resistance raster into QGIS.
-2. Open the plugin (toolbar icon or *Plugins -> &Wildboar Connectivity v2*).
-3. Pick the resistance raster and the habitats layer from the dropdowns.
-4. Click **Pick center point on map**, then click anywhere — this point
-   is the centre of the analysis circle (no need to hit a habitat).
-5. Set the **wild boar range radius** (default 7 km — slightly larger
-   than a typical home range, smaller than dispersal).
-6. Enable the methods you want, press **Run**.
+1. Load your Keeley-transformed iSSF resistance raster into QGIS.
+2. Open the plugin (toolbar icon or *Plugins → Wildboar Connectivity (ASF)*).
+3. Select the resistance raster and (optionally) a core-habitat polygon layer.
+4. Click **Pick outbreak point** and click the infection location on the map.
+5. Enable the desired outputs and press **Run**.
+6. Optionally draw fences or place wildlife overpasses, then press **Run** again
+   to compare.
 
-Outputs (added as layers, top to bottom):
+## Outputs
 
-| Layer | Type | Content |
-|---|---|---|
-| `Pinchpoints (log10 cum. current, N pairs)` | raster (Magma ramp) | sum of \|edge currents\| over every habitat pair, log10 stretched, habitats masked |
-| `LCP corridors (N pairs)` | line vector | one feature per pair, attrs `from_id`, `to_id`, `cost` |
-| `Habitat graph - edges (E)` | line vector | straight edges between habitat centroids, attrs `cost`, `weight = 1/cost` |
-| `Habitat graph - nodes (N)` | point vector | habitat centroids with `degree`, `betweenness`, `area_km2` |
-| `Selected habitats (N)` | polygon vector | the habitats inside the circle |
-| `Analysis range (buffer)` | polygon vector | the wild-boar range circle |
-| `Analysis centre` | point vector | the click point |
+| Layer | Content |
+|---|---|
+| Infection risk (resistant kernel) | `exp(−cost/D)` decay from origin, green/yellow/red |
+| LCP corridors | Least-cost paths to nearest low-resistance clusters, weighted by cluster size |
+| Pinchpoints (Circuit theory) | Circuitscape.jl current density; bright = movement bottleneck |
+| BCRW random-walk density | Biased correlated random-walk visit counts (optional) |
+| iSSF-IBMM contamination probability | log₁₀(p) contamination per cell from agent simulation (optional) |
 
-## Why a small scale?
+## Analysis method
 
-Wild boar daily movement is ~1-5 km; mean dispersal ~10 km. Modeling
-connectivity across an entire canton mixes ecologically incompatible
-scales. Restricting each analysis to a local neighborhood around one
-core habitat is both faster and biologically meaningful — and it
-mirrors how an ASF response zone would be defined.
+**Source disc** — a small disc (radius = 2 pixels, ≈ 50 m) at the clicked
+pixel. Snaps to the nearest passable cell if the click lands on a wall.
 
-## What the pinchpoint map actually shows
+**Dijkstra** — one sweep from the source disc gives cost-distances to all
+reachable cells. The AOI is every cell with finite cost.
 
-Each pixel value = sum of |edge current| flowing through that cell,
-summed across every habitat pair. Bright streaks = corridors used by
-**multiple** pairs. The brightest narrow streaks are **pinchpoints**:
-cells where many corridors converge, whose loss would disconnect the
-local network. These are the natural targets for fencing decisions or
-landscape restoration.
+**Infection risk** — `risk = exp(−cost / D_cost)` where `D_cost` is the cost
+of walking 4 km (published mean wild-boar natal dispersal) through
+median-resistance terrain. Maps directly to EFSA (2018) operational zones:
+risk > 0.5 → protection zone, 0.15–0.5 → surveillance zone.
 
-Values are log10(amps) because raw current spans 3+ orders of magnitude.
+**LCP corridors** — for each low-resistance cluster in the AOI, the cheapest
+MCP traceback from its entry cell back to the source disc is found. Segments
+shared by many LCPs accumulate strength; the backbone corridor stands out.
 
-## Mathematical core
+**Circuit theory** — Circuitscape.jl (Julia) if available, otherwise a scipy
+sparse Laplacian solve. Source = small disc at origin; sink = AOI boundary
+cells. Source cells are masked to NaN before display to remove the injection
+artefact.
 
-For 4-connected cells (i, j):
+**BCRW** — biased correlated random walk. Each step selects a neighbour
+proportional to `1/(R × step_dist) × exp(κ cos θ)` (cost bias × von Mises
+directional persistence, κ = 2).
 
-    R_edge = 0.5 * (R_i + R_j)         # cells in series, half each
-    g_ij   = 1 / R_edge                 # conductance
+**iSSF-IBMM** — per-agent stochastic infectious period from
+`Gamma(shape=3, scale=3.5 d)` × 20 steps/day (EFSA 2018). Selection surface
+recovered from the resistance raster via the inverse Keeley transform
+`S = 1 − log(R)/4`. Output is `log₁₀(contamination probability)`.
 
-Weighted graph Laplacian:
+## Landscape modifications
 
-    L = D - A,   D_ii = sum_j g_ij,   A_ij = g_ij
+Draw a **fence** (left-click vertices, right-click to finish) to burn NaN
+walls into a working copy of the resistance grid. Place an **overpass** to
+punch a minimum-resistance disc through any barrier. Press **Reset** to clear
+all modifications.
 
-For each pair of habitats (A, B):
-
-    b[A] = +1/|A|,  b[B] = -1/|B|        # area sources (no point singularities)
-    solve  L v = b   with one corner grounded
-    I_e = g_ij (v_i - v_j)                # edge currents
-
-Cumulative across pairs:
-
-    Cum_e = sum_pairs |I_e|
-    node  = 0.5 * sum_{j ~ i} Cum(i,j)
-
-The Laplacian is factored **once** (`scipy.sparse.linalg.splu`); every
-pairwise solve is a cheap back-substitution.
-
-## Files
-
-* `main_plugin.py` - plugin class, UI wiring, habitat picking, buffering
-* `connectivity_task.py` - `QgsTask` with all the math (rasterise habitats, build L, factor, solve, accumulate)
-* `point_tool.py` - `QgsMapToolEmitPoint` subclass that emits a signal carrying a role tag
-* `connectivity_dialog.py` / `connectivity_dialog_base.ui` - dialog
-* `__init__.py`, `metadata.txt`, `icon.png`
-
-## Install (dev)
-
-Copy to the QGIS plugins folder:
+## Installation (development)
 
 ```powershell
-Copy-Item -Recurse -Force `
-  "$pwd\qgis_plugin\wildboar_connectivity" `
-  "$env:APPDATA\QGIS\QGIS3\profiles\default\python\plugins\"
-```
-
-Or, for live editing, create a directory symlink (Admin PowerShell):
-
-```powershell
-Remove-Item "$env:APPDATA\QGIS\QGIS3\profiles\default\python\plugins\wildboar_connectivity" -Recurse -Force
+# Symlink (Admin PowerShell — live-reload on save)
 New-Item -ItemType SymbolicLink `
-  -Path  "$env:APPDATA\QGIS\QGIS3\profiles\default\python\plugins\wildboar_connectivity" `
+  -Path   "$env:APPDATA\QGIS\QGIS3\profiles\default\python\plugins\wildboar_connectivity" `
   -Target "$pwd\qgis_plugin\wildboar_connectivity"
 ```
 
-Then enable **Wildboar Connectivity v2** in *Plugins -> Manage and
-Install*.
+Then enable **Wildboar Connectivity (ASF)** in *Plugins → Manage and Install*.
 
 ## Python dependencies
 
-Beyond what ships with QGIS 3 (rasterio is usually bundled):
-
 ```cmd
+# Run in the OSGeo4W Shell
 python -m pip install scikit-image scipy
 ```
 
-Run that in the OSGeo4W Shell so the packages land in QGIS's Python.
+Julia + Circuitscape.jl (optional, for the pinchpoint solver):
+```julia
+using Pkg; Pkg.add("Circuitscape")
+```
 
-## Known limits / future work
+## File structure
 
-- **4-connected grid.** Mild Manhattan bias in the current field. An
-  8-connected variant is a 10-line change.
-- **One starting habitat per run.** True all-to-all across the entire
-  canton is intentionally not done — see "Why a small scale" above.
-- **Single Laplacian factorization** assumes the resistance window fits
-  in memory comfortably. Up to ~250 k cells (e.g. 500x500) is fine on
-  a laptop; beyond that, switch to CG.
+| File | Role |
+|---|---|
+| `main_plugin.py` | Plugin entry, UI wiring, tool activation |
+| `connectivity_task.py` | QgsTask: all analysis (Dijkstra, LCPs, Circuit, BCRW, IBMM) |
+| `connectivity_dialog_base.ui` | Qt Designer dialog layout |
+| `connectivity_dialog.py` | uic loader for the dialog |
+| `circuitscape_jl.py` | Subprocess wrapper for Circuitscape.jl |
+| `resistance_editor.py` | Applies fences/overpasses to the resistance array |
+| `fence_tool.py` | Polyline-drawing map tool |
+| `point_tool.py` | Single-point capture map tool |
+| `layer_utils.py` | Layer z-ordering and project management helpers |
+| `__init__.py`, `metadata.txt`, `icon.png` | QGIS plugin boilerplate |

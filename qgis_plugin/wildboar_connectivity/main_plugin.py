@@ -33,7 +33,6 @@ from qgis.core import (
     QgsApplication,
     QgsCoordinateTransform,
     QgsFeature,
-    QgsField,
     QgsGeometry,
     QgsMapLayerProxyModel,
     QgsMessageLog,
@@ -43,7 +42,7 @@ from qgis.core import (
     QgsVectorLayer,
     QgsWkbTypes,
 )
-from qgis.PyQt.QtCore import QCoreApplication, QSettings, QTranslator, QVariant
+from qgis.PyQt.QtCore import QCoreApplication, QSettings, QTranslator
 from qgis.PyQt.QtGui import QColor, QIcon
 from qgis.PyQt.QtWidgets import QAction, QMessageBox
 
@@ -53,7 +52,7 @@ from .fence_tool import FenceDrawingTool
 from .layer_utils import (
     ZOrder,
     add_wildboar_layer,
-    ensure_google_satellite,
+    ensure_swissimage,
     remove_all_wildboar_layers,
 )
 from .point_tool import PointSelectionTool
@@ -129,7 +128,7 @@ class WildboarConnectivity:
                 except Exception:
                     pass
         try:
-            remove_all_wildboar_layers(keep_google=False)
+            remove_all_wildboar_layers(keep_basemap=False)
         except Exception:
             pass
 
@@ -244,7 +243,7 @@ class WildboarConnectivity:
             sym = lay.renderer().symbol()
             sym.setColor(QColor("#e74c3c"))
             sym.setWidth(2.0)
-            add_wildboar_layer(lay, ZOrder.SELECTED_HABITATS - 1)
+            add_wildboar_layer(lay, ZOrder.FENCES)
 
         if self.overpasses:
             lay = QgsVectorLayer(
@@ -259,7 +258,7 @@ class WildboarConnectivity:
             sym = lay.renderer().symbol()
             sym.setColor(QColor("#3498db"))
             sym.setSize(3.5)
-            add_wildboar_layer(lay, ZOrder.SELECTED_HABITATS - 1)
+            add_wildboar_layer(lay, ZOrder.FENCES)
 
     # -----------------------------------------------------------------
     # Run
@@ -327,9 +326,9 @@ class WildboarConnectivity:
         # low-resistance clusters from the raster.
         habitats_geojson = self._collect_habitat_polygons(tr_to_raster)
 
-        # ---- Clean previous outputs, keep Google satellite -----------
-        remove_all_wildboar_layers(keep_google=True)
-        ensure_google_satellite(opacity=0.3)
+        # ---- Clean previous outputs, keep Swissimage basemap --------
+        remove_all_wildboar_layers(keep_basemap=True)
+        ensure_swissimage(opacity=0.6)
         self._show_origin_preview(origin_in_raster, raster_crs)
         self._refresh_mods_preview_layer()
 

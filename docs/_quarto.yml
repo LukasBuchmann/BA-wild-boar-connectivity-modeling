@@ -3,16 +3,17 @@ project:
   output-dir: docs
 
 book:
-  title: "Robuste Regression und Outlier Erkennung"
-  subtitle: "Einfache Regression"
+  title: "An Interactive Planning Tool for Wild Boar Connectivity and African Swine Fever Prevention"
+  subtitle: "A QGIS plugin for scenario-based connectivity modelling in the Canton of Zürich"
   author:
-    - Peter Rousseeuw
-  date: "2024-12-15"
-  downloads: pdf           # adds a PDF download button to the HTML navbar
+    - Lukas Buchmann
+  date: "2026-07-02"
+  downloads: pdf
   chapters:
     - file: index.qmd
-      text: "Titelseite"   # sidebar label for the title page
+      text: "Titelseite"
     - 1-zusammenfassung.qmd
+    - 1b-abkuerzungen.qmd
     - 2-einleitung.qmd
     - 3-literatur.qmd
     - 4-methoden.qmd
@@ -22,33 +23,33 @@ book:
   appendices:
     - 7-anhang-rohdaten.qmd
     - 8-anhang-statistik.qmd
+    - 9-anhang-ki.qmd
+    - 10-anhang-reproduzierbarkeit.qmd
 
 bibliography: references.bib
-lang: en                   # controls automatic text (e.g. "Abgabedatum" vs "Submission date")
+lang: en
+prefer-html: true
 
-institut: "Institut für Umwelt und Natürliche Ressourcen"
-keywords: "Robuste Regression, Ausreisser, Allometrie, Säugetiere, Gehirngrösse, Statistik"
-confidential: true         # adds a "Vertraulich" notice on the title page
+institut: "Institute for Computational Life Sciences"
+keywords: "wild boar, Sus scrofa, African swine fever, landscape connectivity, resistance surface, circuit theory, step-selection function, QGIS plugin, Canton Zürich"
+confidential: false
 zhaw-cover-image:
   src: cover.png
-  max-width: 100%          # optional, constrains the image on the title page
+  max-width: 100%
   max-height: 5cm
 thesis-type: "Bachelor Thesis"
-degree-type: "Bachelorstudiengang"
-study-year: "2023"
-submission-date: "2024-12-15"
-study-direction: "Applied Digital Life Sciences"
+degree-type: "Bachelor of Science in Applied Digital Life Sciences"
+study-year: "2026"
+submission-date: "2026-07-02"
+study-direction: "Digital Environment"
 supervisors:
-  - title: "Prof. Dr."
-    name: "Max Mustermann"
+  - title:
+    name: "Ratnaweera Nils"
     affiliation: "ZHAW Life Sciences und Facility Management, Wädenswil"
-  - title: "Dr."
-    name: "Anna Beispiel"
-    affiliation: "ETH Zürich, Institut für Umweltingenieurwissenschaften, Zürich"
-  - title: "Prof. Dr."
-    name: "Susanne Müller"
-    affiliation: "Universität Zürich, Institut für Evolutionsbiologie und Umweltwissenschaften, Zürich"
+  - title:
+    name: "Sigrist Benjamin"
+    affiliation: "ZHAW Life Sciences und Facility Management, Wädenswil"
 
 format:
-  zhaw-lsfm-typst: default
   zhaw-lsfm-html: default
+  zhaw-lsfm-typst: default

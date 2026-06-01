@@ -1,6 +1,6 @@
 # Introduction
 
-The Swiss Mittelland is among the most densely settled and intensively managed landscapes in Central Europe. Roads, railways, urban expansion and intensive agriculture collectively form a network of barriers that fragments natural habitats and restricts the free movement of wildlife across the region. For large mammals, this fragmentation carries serious long-term consequences: reduced population exchange, diminishing genetic diversity and, ultimately, a decline in regional population viability [@fischer2024; @urbina2023]. In a landscape as structurally altered as the Canton of Zurich, restoring meaningful ecological connectivity is therefore an active and ongoing challenge for wildlife managers and spatial planners.
+The Swiss Mittelland is among the most densely settled and intensively managed landscapes in Central Europe. Roads, railways, urban expansion and intensive agriculture collectively form a network of barriers that fragments natural habitats and restricts the free movement of wildlife across the region. For large mammals, this fragmentation carries serious long-term consequences: reduced population exchange, diminishing genetic diversity and a decline in regional population viability [@fischer2024; @urbina2023]. In a landscape as structurally altered as the Canton of Zurich, restoring meaningful ecological connectivity is therefore an active and ongoing challenge for wildlife managers and spatial planners.
 
 In response, spatial planning frequently relies on targeted structural interventions such as wildlife overpasses and underpasses, whose effectiveness for species like red deer (*Cervus elaphus*) has been documented across Switzerland and neighbouring France [@fischer2024; @urbina2023]. Assessing where such infrastructure is most needed requires spatially explicit connectivity models. Robust frameworks for this purpose have been established and validated at the regional scale by @urbina2023 and, more recently, for the Swiss Mittelland by @fischer2024, producing maps of movement corridors, pinch points and connectivity bottlenecks that can directly guide conservation planning.
 
@@ -20,4 +20,18 @@ Two specific objectives guide this work. The first is the methodological adaptat
 
 ## AI declaration
 
-*AI declaration (required per ZHAW Z_RL_Richtlinie_Anhang, section 3.IV): [To be completed by the author. Describe here how generative AI tools were used during the preparation of this thesis, including their role in literature research, text drafting, structuring, or code development. List all tools used in the separate AI tools register in the appendix.]*
+In accordance with the ZHAW guidelines regarding scientific integrity and the use of digital tools, generative AI systems were utilized to support the technical implementation and linguistic quality of this project. Specifically, Large Language Models (Claude and Google Gemini) were employed for the following purposes:
+
+• Code Assistance: The AI served as a technical assistant for creating and debugging R and Python scripts. All generated code snippets were critically reviewed, tested, and adapted by the author to ensure functionality.
+
+• Linguistic Refinement: AI tools were used to improve the grammatical accuracy and
+readability of the English text. The underlying scientific arguments and structure remain
+the original work of the author.
+
+• Methodological Understanding and Clarifications: AI was utilized as a sparring partner to discuss and refine spatial modeling approaches, structural workflows, and classification frameworks. All final methodological decisions and model architectures were independently determined by the author.
+
+• Document Formatting: AI assistance was employed to troubleshoot and optimize the syntax for typesetting systems (e.g., Quarto) used in compiling the final scientific report.
+
+The verification of the accuracy and relevance of the AI-generated outputs, as well as the
+responsibility for the final content, lies solely with the author. A detailed list of the specific
+tools used is provided in the Appendix.

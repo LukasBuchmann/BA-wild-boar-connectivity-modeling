@@ -80,11 +80,11 @@ ASF_DISPERSAL_KM = 4.0
 # =================================================================
 # iSSF-IBMM parameters
 # Movement kernel fitted to WildBoar_InMatrix_Steps.csv 
-# Updated with final iSSF coefficients (log_sl = 0.153, cos_ta = 0.564)
+# Updated with final iSSF coefficients (log_sl = 0.16877, cos_ta = 0.57314)
 # =================================================================
-IBMM_SL_GAMMA_SHAPE    = 2.65258  # tentative (2.5) + beta_log_sl
+IBMM_SL_GAMMA_SHAPE    = 2.66877  # tentative (2.5) + beta_log_sl
 IBMM_SL_GAMMA_SCALE_M  = 160.0    # step-length scale (metres)
-IBMM_KAPPA             = 1.06417  # tentative (0.5) + beta_cos_ta 
+IBMM_KAPPA             = 1.07314  # tentative (0.5) + beta_cos_ta 
 IBMM_N_CANDIDATES      = 25       # candidate endpoints per step
 
 # ASF infectious period: Gamma(3, 3.5 d) → mean 10.5 d (EFSA 2018)

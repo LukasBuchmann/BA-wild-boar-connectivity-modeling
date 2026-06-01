@@ -1,23 +1,25 @@
 # Declaration of Generative AI Use {#sec-ai-declaration}
 
-::: {.callout-warning}
-This register must be completed and verified by the author so that it truthfully reflects the actual tools and purposes used during this thesis. The entries below are a starting template based on the ZHAW directive Z_RL Richtlinie Anhang Deklarationspflicht KI bei Arbeiten (version 1.1.0). Add, remove, or correct entries as needed, and make sure the narrative description in the introduction (section 3.IV of the directive) matches this register.
-:::
-
-In accordance with the ZHAW declaration requirement for generative AI, the generative AI systems used in the preparation of this thesis are listed below together with their purpose. Prompts and their corresponding outputs are not declared, in line with section 3.III of the directive. A summary narrative of how these systems were used, including their role as a source of inspiration and critical dialogue, is given in the introduction.
+In accordance with the ZHAW declaration requirement for generative AI, the generative AI systems used in the preparation of this thesis are listed below together with their purpose. Prompts and their corresponding outputs are not declared. A summary narrative of how these systems were used, including their role as a source of inspiration and critical dialogue, is given in the introduction.
 
 ## Register of Generative AI Systems
 
-Anthropic. (2026). *Claude* (Opus 4 / Cowork). https://claude.ai
+Anthropic. (2026). *Claude* (Opus 4, Cowork). https://claude.ai
 
-- Research assistance and verification of bibliographic references
-- Drafting and reformulation of text passages
+- Research and verification of bibliographic references
+- Drafting, condensing, and reformulation of text passages
 - Structuring of chapters and sections
-- Editorial checking of formatting and citation consistency
+- Generating R code for the schematic figures in the theory chapter
+- Generation and debugging of R and Python code
+- Assistance in the creation of the QGIS Plugin
 
-[TO COMPLETE] Add any further tools that were actually used, for example:
+Google. (2026). *Gemini*. https://gemini.google.com
 
-- [Tool name]. ([Year]). *[Model name]* ([Version]). [URL] — [purpose, e.g. translation of text passages, image generation, literature search]
+- Literature research and locating relevant sources
+- Structuring of chapters and sections
+- Generating and reformulating text suggestions
+- Explaining and summarising technical concepts
+- Generation and debugging of R and Python code
 
 ## Scope of Use
 

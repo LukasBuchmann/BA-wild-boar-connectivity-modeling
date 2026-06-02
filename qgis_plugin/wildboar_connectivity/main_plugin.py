@@ -47,15 +47,15 @@ from qgis.PyQt.QtGui import QColor, QIcon
 from qgis.PyQt.QtWidgets import QAction, QMessageBox
 
 from .connectivity_dialog import WildboarConnectivityDialog
-from .connectivity_task import AsfConnectivityTask
-from .fence_tool import FenceDrawingTool
-from .layer_utils import (
+from .analysis.connectivity_task import AsfConnectivityTask
+from .tools.fence_tool import FenceDrawingTool
+from .utils.layer_utils import (
     ZOrder,
     add_wildboar_layer,
     ensure_swissimage,
     remove_all_wildboar_layers,
 )
-from .point_tool import PointSelectionTool
+from .tools.point_tool import PointSelectionTool
 
 
 LOG_TAG = "wildboar-asf"

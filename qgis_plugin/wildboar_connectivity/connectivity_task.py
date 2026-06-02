@@ -675,31 +675,36 @@ class AsfConnectivityTask(QgsTask):
             for (_cost, r, c, size) in clusters
         ]
 
-        # --- Traceback each anchor and carry its cluster size --------
-        paths_with_strength = []   # list of (cells, cluster_size)
-        for _cost, r, c, size in clusters:
+        # --- Traceback each anchor and carry cost-distance weight --------
+        # Strength is the INVERSE of the entry cost: a nearby cluster
+        # (low cost) produces a high weight, so the visualisation highlights
+        # corridors that are cheapest to reach rather than corridors that
+        # lead to large habitat patches.
+        paths_with_strength = []   # list of (cells, weight)
+        for entry_cost, r, c, _size in clusters:
             try:
                 indices = mcp.traceback((r, c))
             except Exception:
                 continue
             cells = [(int(ri), int(ci)) for ri, ci in indices]
             if len(cells) >= 2:
-                paths_with_strength.append((cells, size))
+                # Guard against zero cost (origin cluster); 1e-6 floor prevents inf.
+                weight = 1.0 / max(entry_cost, 1e-6)
+                paths_with_strength.append((cells, weight))
         self.n_lcps = len(paths_with_strength)
         if not paths_with_strength:
             return
 
         # --- Cumulative edge strength --------------------------------
-        # Each edge's strength = SUM of destination cluster sizes of
-        # every LCP that traverses it. Shared backbone segments stack
-        # up automatically: a corridor leading to several large
-        # clusters ends up far heavier than a one-cluster detour.
+        # Each edge accumulates the inverse-cost weights of every LCP
+        # that traverses it. Shared backbone segments to nearby clusters
+        # end up with the highest combined weight.
         from collections import defaultdict
-        edge_strength = defaultdict(int)
-        for cells, strength in paths_with_strength:
+        edge_strength = defaultdict(float)
+        for cells, weight in paths_with_strength:
             for a, b in zip(cells, cells[1:]):
                 edge = (a, b) if a < b else (b, a)
-                edge_strength[edge] += int(strength)
+                edge_strength[edge] += weight
 
         # --- Merge into uniform-strength polylines -------------------
         visited = set()

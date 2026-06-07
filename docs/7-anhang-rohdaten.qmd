@@ -1,45 +1,21 @@
-# Data Sources and Input Datasets
+# Data Sources and Input Datasets {#sec-data}
 
 This appendix documents the origin, version, and role of every dataset used to build the resistance surface and to develop the QGIS plugin. All spatial layers were standardised to the Swiss coordinate reference system LV95 (EPSG:2056) before processing.
 
 ## Overview of Input Datasets
 
 | Dataset | Provider | Version / edition | Native CRS | Role in the pipeline |
-|---|---|---|---|---|
-| Wild boar GPS telemetry (Wildschweinschreck) | WILMA, ZHAW | 2014 to 2017, 36 individuals | LV03 (EPSG:21781) | Empirical calibration of the iSSF |
+|---------------|---------------|---------------|---------------|---------------|
+| Wild boar GPS telemetry | WILMA, ZHAW | 2014 to 2017, 16 individuals | LV03 (EPSG:21781) | Empirical calibration of the iSSF |
 | swissBOUNDARIES3D | swisstopo | 1.5 | LV95 (LN02) | Cantonal study area extents |
 | swissTLM3D | swisstopo | 2026 edition | LV95 | Forest, roads, railways, settlements, water |
 | DHM25 (`dhm25_grid_raster.asc`) | swisstopo | legacy, surveyed 1952 to 1999 | LV03 (EPSG:21781) | Slope and Terrain Ruggedness Index |
 | Wildlife passages (`Wildtierpassagen.gdb`) | FOEN | N2023 version | LV95 | Permeability override at crossing structures |
-| Permanent ASP fences (`Dauerzaeune.shp`) | Cantonal Veterinary Office Zürich | delivered for this thesis | LV95 | Absolute barriers in the Zürich surface |
+| Permanent ASP fences (`Dauerzaeune.shp`) | WILMA, ZHAW | December 2024 | LV95 | Absolute barriers in the Zürich surface |
 | Wild boar core habitats (`Potenzial_Wildschwein_Kerneinstaende_ZH_2024_WILMA.shp`) | WILMA, ZHAW | December 2024 | LV95 | Spatial validation anchors and LCP targets |
 
-: Input datasets, their providers, versions, and function in the analysis. {#tbl-datasets}
-
-## Telemetry Data Quality and Exclusions
-
-The raw telemetry comprised 36 GSM-GPS deployments recorded at a nominal 15-minute fix interval. The following cleaning and exclusion steps were applied before any movement statistics were computed. The first five days of each deployment were removed as a capture-shock buffer. Deployments with fewer than 100 fixes or spanning less than 30 days after cleaning were excluded. One deployment, `027_Agat_13970`, was removed because it was a short re-collaring of an animal already represented by a longer deployment (`027_Agat_13969`) and retained only 50.6 percent of its scheduled fixes. After duplicate collapse, the remaining deployments retained at least 90 percent of unique scheduled fixes, yielding 132,388 classified steps of which 7,810 were in-matrix transit steps.
-
-## Detailed Layer Processing
-
-This section records the dataset-specific processing decisions that were condensed in the methods chapter, so that the pipeline remains fully reproducible.
-
-**swissBOUNDARIES3D (version 1.5, swisstopo).** Administrative geometries were extracted from the `TLM_KANTONSGEBIET` polygon feature class. The dataset has a stated geometric accuracy of about ±0.5 metres in position and elevation. Extracted cantonal geometries were buffered by 2,000 metres and converted to a rectangular processing extent, passed as a Well-Known Text filter to the vector reading functions to load only intersecting geometries.
-
-**swissTLM3D (2026 edition, swisstopo).** Forest was taken from the `tlm_bb_bodenbedeckung` layer, retaining closed forest ("Wald"), open forest ("Wald offen"), scrub ("Gebueschwald"), and woody areas ("Gehoelzflaeche"), and excluding unstocked forest, mining areas, orchards, cemeteries, vineyards, and water-body areas. Roads from `tlm_strassen_strasse` were classified into fenced high-performance roads ("Autobahn", "Autostrasse", "Ausfahrt", "Einfahrt", "Zufahrt", "Autozug"), main roads ("10m/8m/6m Strasse"), and secondary roads ("4m/3m Strasse", "2m Weg", "Verbindung", "Dienstzufahrt", "Platz"). Settlements used the `tlm_namen_siedlungsname` polygon classes "Ort", "Ortsteil", "Quartier", and "Quartierteil", preferred over building footprints because wild boar respond to the contiguous built-up matrix. All linear features were reduced to two dimensions on import. A `prep_above_ground()` function removed subsurface segments using the `STUFE` vertical-position attribute (retaining values of zero or greater) and the `KUNSTBAUTE` attribute (removing "Tunnel", "Unterfuehrung", "Unterführung", "in Gebaeude", "in Gebäude", in both ASCII and Unicode spellings). A `clean_railways()` function removed out-of-service lines and funiculars, rack railways, and heritage lines. Binary presence rasters used all-touched rasterisation, and Euclidean distance rasters were computed for each class.
-
-**Forest structure.** A binary forest mask, a 50-metre and a 1000-metre circular focal-density layer, and an unsigned distance-to-forest-edge layer were derived from the forest mask. The two density layers represent the immediate (micro-canopy) and macro-scale orders of habitat selection.
-
-**Water.** Standing water from `tlm_gewaesser_stehendes_gewaesser` was reconstructed from three-dimensional shoreline multi-line strings into polygons (Z dropped, grouped by `gwl_nr`, unioned, line-merged, cast to polygons), with island polygons subtracted. Lakes above one square kilometre were held as absolute barriers. Flowing water from `tlm_gewaesser_fliessgewaesser` retained only surface-level features (`verlauf` of "Oberirdisch", "Bruecke", or "Wasserfall"), excluding piped and subterranean streams. A combined distance-to-water layer was computed as the cell-wise minimum of the two components.
-
-**DHM25 (swisstopo).** Slope and the Terrain Ruggedness Index were derived at the native 25-metre resolution. The DHM25 is referenced to LV03 (EPSG:21781), assigned manually before processing, and was reprojected to LV95 by bilinear interpolation. Its vertical accuracy is about ±1.5 metres on the Swiss Plateau and ±3 to ±8 metres in Alpine terrain, and its altitude data were surveyed between 1952 and 1979 with final updates in 1999, so recent terrain alterations are not represented.
-
-**Wildlife passages (FOEN, N2023).** The `N2023_Version_Wildtierpassagen` polygons were reprojected to LV95, buffered by 30 metres, and rasterised so that verified crossings override the barrier effect of fenced motorways.
-
-**Permanent ASP fences (Cantonal Veterinary Office Zürich).** The `Dauerzaeune.shp` woven-wire fences were rasterised and burned in as absolute barriers in the Zürich surface only.
-
-**WILMA core habitats (December 2024).** The `Potenzial_Wildschwein_Kerneinstaende_ZH_2024_WILMA.shp` layer delineates predictive potential resting habitats and was used as a spatial validation anchor and as least-cost-path targets, not as confirmed animal presence.
+: Overview of input datasets, their providers, versions, native coordinate systems, and roles in the modelling pipeline. {#tbl-datasets}
 
 ## Data Availability
 
-All base geodata are drawn from publicly accessible Swiss federal services (swisstopo, FOEN). The GPS telemetry and the permanent ASP fence shapefile were provided by the project partners (WILMA, ZHAW and the Cantonal Veterinary Office of Zürich respectively) and are not publicly redistributable. The processing scripts that transform these inputs into the final resistance rasters are documented in @sec-reproducibility.
+All base geodata are drawn from publicly accessible Swiss federal services (swisstopo, FOEN). The GPS telemetry and the permanent ASP fence shapefile were provided by the project partners (WILMA, ZHAW) and are not publicly redistributable. The processing scripts that transform these inputs into the final resistance rasters are documented in @sec-reproducibility.

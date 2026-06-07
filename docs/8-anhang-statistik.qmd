@@ -4,12 +4,12 @@ This appendix collects the full statistical output of the integrated step-select
 
 ## Final iSSF Coefficients
 
-The final conditional logistic regression was fitted on 7,810 in-matrix transit steps from 36 GPS-collared individuals in Canton Aargau, each compared against ten random control steps. All covariates are z-standardised with the Aargau training mean and standard deviation. The seven retained coefficients, ordered by magnitude, are reproduced in @tbl-issf-coefficients in the results chapter and summarised here for reference: forest density at the 50-metre scale ($\hat{\beta} = 0.513$), distance to railway ($\hat{\beta} = 0.513$), forest density gradient at the 1000-metre scale ($\hat{\beta} = 0.245$), distance to settlement ($\hat{\beta} = 0.224$), distance to main road ($\hat{\beta} = 0.218$), distance to secondary road ($\hat{\beta} = 0.149$), and distance to water ($\hat{\beta} = 0.051$). All coefficients were positive and significant at the 0.05 level, and all variance inflation factors for the retained set were below 1.4.
+The final conditional logistic regression was fitted on 7,824 in-matrix transit steps from 14 GPS-collared individuals in Canton Aargau, each compared against ten random control steps. All covariates are z-standardised with the Aargau training mean and standard deviation. The seven retained coefficients, ordered by magnitude, are summarised here for reference: distance to railway ($\hat{\beta} = 0.558$), forest density at the 50-metre scale ($\hat{\beta} = 0.501$), forest density gradient at the 1000-metre scale ($\hat{\beta} = 0.260$), distance to main road ($\hat{\beta} = 0.232$), distance to settlement ($\hat{\beta} = 0.226$), distance to secondary road ($\hat{\beta} = 0.169$), and distance to water ($\hat{\beta} = 0.052$). All coefficients were positive and significant at the 0.05 level, and all variance inflation factors for the retained set were below 1.4.
 
 ## Variable Selection Record
 
 | Covariate | Decision | Reason |
-|---|---|---|
+|------------------------|------------------------|------------------------|
 | Forest density 50 m | Retained | Strongest selection signal |
 | Forest density gradient 1000 m | Retained | Macro-scale habitat context |
 | Distance to water | Retained | Weak but significant |
@@ -19,13 +19,13 @@ The final conditional logistic regression was fitted on 7,810 in-matrix transit 
 | Distance to railway | Retained | Strong avoidance, wider CI |
 | Binary forest cover | Removed | Redundant with density layers |
 | Distance to forest edge | Removed | Redundant with density layers |
-| Slope | Removed | VIF > 80 with TRI, non-significant |
-| Terrain Ruggedness Index | Removed | VIF > 80 with slope, non-significant |
+| Slope | Removed | VIF \> 80 with TRI, non-significant |
+| Terrain Ruggedness Index | Removed | VIF \> 80 with slope, non-significant |
 | Distance to flowing water | Removed | Collinear with combined distance to water |
 | Distance to lakes | Removed | Collinear with combined distance to water |
 | Distance to fenced road | Removed | Barrier-trapping artifact ($\hat{\beta} = -0.60$) |
 
-: Variable selection decisions for the iSSF covariate set. {#tbl-varselection}
+: Variable selection decisions for the iSSF covariate set.
 
 ## Plugin Analysis Parameters
 

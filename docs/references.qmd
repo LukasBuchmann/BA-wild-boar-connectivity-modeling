@@ -1,3 +1,7 @@
-# Literaturverzeichnis {#sec-refs .unnumbered}
+---
+nocite: |
+  @*
+---
+# Bibliography {#sec-refs .unnumbered}
 
 {{< references >}}

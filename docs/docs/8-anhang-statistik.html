@@ -147,7 +147,7 @@ window.Quarto = {
         <li class="sidebar-item">
   <div class="sidebar-item-container"> 
   <a href="./index.html" class="sidebar-item-text sidebar-link">
- <span class="menu-text">Titelseite</span></a>
+ <span class="menu-text">Front Page</span></a>
   </div>
 </li>
         <li class="sidebar-item">
@@ -195,7 +195,7 @@ window.Quarto = {
         <li class="sidebar-item">
   <div class="sidebar-item-container"> 
   <a href="./references.html" class="sidebar-item-text sidebar-link">
- <span class="menu-text">Literaturverzeichnis</span></a>
+ <span class="menu-text">Bibliography</span></a>
   </div>
 </li>
         <li class="sidebar-item sidebar-item-section">
@@ -247,7 +247,6 @@ window.Quarto = {
   <li><a href="#variable-selection-record" id="toc-variable-selection-record" class="nav-link" data-scroll-target="#variable-selection-record"><span class="header-section-number">B.2</span> Variable Selection Record</a></li>
   <li><a href="#plugin-analysis-parameters" id="toc-plugin-analysis-parameters" class="nav-link" data-scroll-target="#plugin-analysis-parameters"><span class="header-section-number">B.3</span> Plugin Analysis Parameters</a></li>
   <li><a href="#reproducing-the-statistical-output" id="toc-reproducing-the-statistical-output" class="nav-link" data-scroll-target="#reproducing-the-statistical-output"><span class="header-section-number">B.4</span> Reproducing the Statistical Output</a></li>
-  <li><a href="#excluded-covariate-layers" id="toc-excluded-covariate-layers" class="nav-link" data-scroll-target="#excluded-covariate-layers"><span class="header-section-number">B.5</span> Excluded Covariate Layers</a></li>
   </ul>
 </nav>
     </div>
@@ -261,7 +260,7 @@ window.Quarto = {
 <p>This appendix collects the full statistical output of the integrated step-selection function and the parameter settings of the five plugin analysis modules, so that the results in the main text can be reproduced and audited.</p>
 <section id="final-issf-coefficients" class="level2" data-number="B.1">
 <h2 data-number="B.1" class="anchored" data-anchor-id="final-issf-coefficients"><span class="header-section-number">B.1</span> Final iSSF Coefficients</h2>
-<p>The final conditional logistic regression was fitted on 7,810 in-matrix transit steps from 36 GPS-collared individuals in Canton Aargau, each compared against ten random control steps. All covariates are z-standardised with the Aargau training mean and standard deviation. The seven retained coefficients, ordered by magnitude, are reproduced in <span class="quarto-unresolved-ref">?tbl-issf-coefficients</span> in the results chapter and summarised here for reference: forest density at the 50-metre scale (<span class="math inline">\(\hat{\beta} = 0.513\)</span>), distance to railway (<span class="math inline">\(\hat{\beta} = 0.513\)</span>), forest density gradient at the 1000-metre scale (<span class="math inline">\(\hat{\beta} = 0.245\)</span>), distance to settlement (<span class="math inline">\(\hat{\beta} = 0.224\)</span>), distance to main road (<span class="math inline">\(\hat{\beta} = 0.218\)</span>), distance to secondary road (<span class="math inline">\(\hat{\beta} = 0.149\)</span>), and distance to water (<span class="math inline">\(\hat{\beta} = 0.051\)</span>). All coefficients were positive and significant at the 0.05 level, and all variance inflation factors for the retained set were below 1.4.</p>
+<p>The final conditional logistic regression was fitted on 7,824 in-matrix transit steps from 14 GPS-collared individuals in Canton Aargau, each compared against ten random control steps. All covariates are z-standardised with the Aargau training mean and standard deviation. The seven retained coefficients, ordered by magnitude, are summarised here for reference: distance to railway (<span class="math inline">\(\hat{\beta} = 0.558\)</span>), forest density at the 50-metre scale (<span class="math inline">\(\hat{\beta} = 0.501\)</span>), forest density gradient at the 1000-metre scale (<span class="math inline">\(\hat{\beta} = 0.260\)</span>), distance to main road (<span class="math inline">\(\hat{\beta} = 0.232\)</span>), distance to settlement (<span class="math inline">\(\hat{\beta} = 0.226\)</span>), distance to secondary road (<span class="math inline">\(\hat{\beta} = 0.169\)</span>), and distance to water (<span class="math inline">\(\hat{\beta} = 0.052\)</span>). All coefficients were positive and significant at the 0.05 level, and the variance inflation factors for the retained set ranged from 1.08 to 1.49.</p>
 </section>
 <section id="variable-selection-record" class="level2" data-number="B.2">
 <h2 data-number="B.2" class="anchored" data-anchor-id="variable-selection-record"><span class="header-section-number">B.2</span> Variable Selection Record</h2>
@@ -348,64 +347,18 @@ window.Quarto = {
 <tr class="even">
 <td>Distance to fenced road</td>
 <td>Removed</td>
-<td>Barrier-trapping artifact (<span class="math inline">\(\hat{\beta} = -0.60\)</span>)</td>
+<td>Barrier-trapping artifact (<span class="math inline">\(\hat{\beta} = -0.374\)</span>)</td>
 </tr>
 </tbody>
 </table>
 </section>
 <section id="plugin-analysis-parameters" class="level2" data-number="B.3">
 <h2 data-number="B.3" class="anchored" data-anchor-id="plugin-analysis-parameters"><span class="header-section-number">B.3</span> Plugin Analysis Parameters</h2>
-<p>The five analytical modules of the <em>Wildboar Connectivity (ASF)</em> plugin use the following fixed parameters. The analysis window extends 11,500 metres in each direction from the outbreak origin (a 10,000-metre buffer plus a 1,500-metre edge buffer). The infection-risk kernel uses the published mean natal dispersal distance of European wild boar of 4 kilometres, with the EFSA protection zone (3 km) and surveillance zone (10 km) mapped to risk thresholds of 0.50 and 0.15. The biased correlated random walk uses a von Mises concentration of <span class="math inline">\(\kappa = 2.0\)</span>, a 2,000-step limit, and 500 realisations by default. The iSSF-based individual movement model runs 2,000 agents by default, draws the infectious period from a <span class="math inline">\(\text{Gamma}(\alpha = 3, \beta = 3.5\,\text{days})\)</span> distribution (mean 10.5 days), and generates 25 candidate steps per move using a gamma step-length kernel (shape 2.653, scale 160 m) and a von Mises turning kernel (<span class="math inline">\(\kappa = 1.064\)</span>).</p>
+<p>The five analytical modules of the <em>Wildboar Connectivity (ASF)</em> plugin share one analysis window and run on the following fixed default parameters. The window extends 11,500 metres in each direction from the outbreak origin, combining a 10,000-metre buffer with a 1,500-metre edge buffer. The infection-risk kernel rescales the published mean natal dispersal distance of European wild boar, 4 kilometres, into the cost-distance surface, mapping the EFSA protection zone (3 km) and surveillance zone (10 km) onto risk thresholds of 0.50 and 0.15. The biased correlated random walk releases 500 walkers by default, each taking up to 2,000 steps with a von Mises directional concentration of <span class="math inline">\(\kappa = 2.0\)</span>. The iSSF-based individual movement model runs 2,000 agents by default. Each agent draws its infectious period from a <span class="math inline">\(\text{Gamma}(\alpha = 3, \beta = 3.5\,\text{days})\)</span> distribution with a mean of 10.5 days, and at every move it evaluates 25 candidate endpoints generated from a gamma step-length kernel (shape 2.669, scale 160 m) and a von Mises turning-angle kernel (<span class="math inline">\(\kappa = 1.073\)</span>).</p>
 </section>
 <section id="reproducing-the-statistical-output" class="level2" data-number="B.4">
 <h2 data-number="B.4" class="anchored" data-anchor-id="reproducing-the-statistical-output"><span class="header-section-number">B.4</span> Reproducing the Statistical Output</h2>
 <p>The iSSF coefficient table, the step classification counts, and all covariate summary statistics reported in the results chapter are produced directly from the processed data files by the R code chunks embedded in <code>5-ergebnisse.qmd</code>. Running the Quarto document against the processed data directory regenerates every table and figure deterministically.</p>
-</section>
-<section id="excluded-covariate-layers" class="level2" data-number="B.5">
-<h2 data-number="B.5" class="anchored" data-anchor-id="excluded-covariate-layers"><span class="header-section-number">B.5</span> Excluded Covariate Layers</h2>
-<p>The following maps document the covariate layers that were computed in the pipeline but excluded from the final iSSF model. They are provided here for completeness and spatial context.</p>
-<div class="cell">
-<div class="cell-output-display">
-<div id="fig-forest-edge-dist" class="quarto-float quarto-figure quarto-figure-center anchored">
-<figure class="quarto-float quarto-float-fig figure">
-<div aria-describedby="fig-forest-edge-dist-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-<img src="8-anhang-statistik_files/figure-html/fig-forest-edge-dist-1.png" class="img-fluid figure-img" width="825">
-</div>
-<figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-forest-edge-dist-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-Figure&nbsp;B.1: Distance to forest edge (metres) for the Aargau study area. Values range from 25 m (the minimum possible at 25-metre resolution) to 3,281 m. This layer was excluded from the final iSSF model because of its high VIF with the forest density layers.
-</figcaption>
-</figure>
-</div>
-</div>
-</div>
-<div class="cell">
-<div class="cell-output-display">
-<div id="fig-terrain-covariates" class="quarto-float quarto-figure quarto-figure-center anchored">
-<figure class="quarto-float quarto-float-fig figure">
-<div aria-describedby="fig-terrain-covariates-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-<img src="8-anhang-statistik_files/figure-html/fig-terrain-covariates-1.png" class="img-fluid figure-img" width="1350">
-</div>
-<figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-terrain-covariates-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-Figure&nbsp;B.2: Terrain covariates derived from the DHM25 digital elevation model. <strong>Left:</strong> Slope in degrees. <strong>Right:</strong> Terrain Ruggedness Index (TRI, dimensionless). Both layers were excluded from the final iSSF model due to extreme multicollinearity with the forest density layers (VIF &gt; 80).
-</figcaption>
-</figure>
-</div>
-</div>
-</div>
-<div class="cell">
-<div class="cell-output-display">
-<div id="fig-fenced-road" class="quarto-float quarto-figure quarto-figure-center anchored">
-<figure class="quarto-float quarto-float-fig figure">
-<div aria-describedby="fig-fenced-road-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-<img src="8-anhang-statistik_files/figure-html/fig-fenced-road-1.png" class="img-fluid figure-img" width="825">
-</div>
-<figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-fenced-road-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-Figure&nbsp;B.3: Distance to fenced road (motorway and motorway access segments) in the Aargau study area. The extreme spatial sparsity of this feature (mean 4,179 m, maximum 16,710 m) produced a barrier-trapping artifact in the iSSF and led to exclusion of this covariate before model fitting.
-</figcaption>
-</figure>
-</div>
-</div>
-</div>
 
 
 </section>

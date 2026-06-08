@@ -18,8 +18,14 @@ Author : Lukas Buchmann <buchmluk@students.zhaw.ch>
 """
 
 
+# QGIS calls this function by name when it loads the plugin. The name and
+# the camelCase signature are fixed by the QGIS plugin API, which is why the
+# two comments below silence the linter warnings about the naming style.
+# The import is done inside the function (instead of at the top of the file)
+# so that QGIS can discover the plugin without first importing the heavy
+# main_plugin module, which in turn pulls in all the analysis dependencies.
 # noinspection PyPep8Naming
 def classFactory(iface):  # pylint: disable=invalid-name
-    """Load WildboarConnectivity from main_plugin.py."""
+    """Create and return the plugin instance, handing it the QGIS interface."""
     from .main_plugin import WildboarConnectivity
     return WildboarConnectivity(iface)

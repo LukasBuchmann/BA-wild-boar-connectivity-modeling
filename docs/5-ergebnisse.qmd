@@ -6,8 +6,13 @@ Two primary deliverables were created during this project: a 25-metre resolution
 #| label: setup
 #| include: false
 
+# Flush any HTML widget dependencies left over from a previous render pass
+# of this same document (e.g. the HTML pass), so the typst pass starts from
+# a clean slate and isn't flagged for HTML output it never produced itself.
+invisible(knitr::knit_meta(class = NULL, clean = TRUE))
+
 # ── Project paths ──────────────────────────────────────────────────────────
-project_root <- "C:/ZHAW/6.Semester/BA/BA-wild-boar-connectivity-modeling"
+project_root <- ".."
 data_temp    <- file.path(project_root, "data/temp")
 data_proc    <- file.path(project_root, "data/processed")
 data_raw     <- file.path(project_root, "data/raw")
@@ -92,31 +97,30 @@ Raw GPS telemetry data from 16 wild boar tracked in Canton Aargau between 2014 a
 
 The three-rule hierarchical classifier partitioned these steps into 7,824 (5.9%) in-matrix transit steps and 125,285 (94.1%) in-patch resting steps. Among in-matrix steps, Rule 1 (step length greater than 250 metres) captured 4,759 steps (60.8% of all in-matrix steps), Rule 2 (step length greater than 150 metres and absolute turning angle below π/4 radians) contributed 2,748 steps (35.1%), and Rule 3 (three or more consecutive directional steps each exceeding 100 metres) added 317 steps (4.1%). The in-matrix dataset served as the sole analytical sample for iSSF fitting. In-patch steps were excluded from the model because they describe resting and foraging behaviour within habitat patches rather than landscape-level transit between patches, and combining the two behavioural states would confound the resistance surface.
 
-In-matrix step lengths ranged from 100 metres to 2,840 metres with a mean of 298 metres, a median of 273 metres, and a standard deviation of 137 metres. The distribution is right-skewed, consistent with the gamma-distributed step-length kernel assumed by the iSSF movement model. Turning angles were approximately symmetric around zero with a standard deviation of approximately 59 degrees, indicating moderate directional persistence during transit. These values support the movement-kernel assumptions underlying the iSSF and confirm that the retained steps reflect directed transit rather than stationary behaviour.
-
 ```{r}
 #| label: tbl-classification
 #| tbl-cap: "Step classification counts for the in-matrix telemetry dataset. Rules are applied hierarchically in the order shown. A step is classified as in-matrix if it meets any rule that has not been met by a prior rule."
 
 rule_df <- data.frame(
-  Rule = c("Rule 1", "Rule 2", "Rule 3", "Total in-matrix", "In-patch"),
+  Rule = c("Rule 1", "Rule 2", "Rule 3", "**Total in-matrix**", "*In-patch*"),
   Criterion = c(
     "Step length > 250 m",
     "Step length > 150 m AND turning angle < π/4",
     "≥ 3 consecutive steps: length > 100 m AND turning angle < π/4",
-    "—",
-    "All remaining steps (conservative default)"
+    "**—**",
+    "*All remaining steps (conservative default)*"
   ),
-  `Steps (n)` = c(4759, 2748, 317, 7824, 125285),
-  `Share of in-matrix (%)` = c(60.8, 35.1, 4.1, 100.0, NA),
+  `Steps (n)` = c("4759", "2748", "317", "**7824**", "*125285*"),
+  `Share of in-matrix (%)` = c("60.8", "35.1", "4.1", "**100.0**", "*—*"),
   check.names = FALSE
 )
-rule_df[is.na(rule_df)] <- "—"
 
-kable(rule_df, align = c("l", "l", "r", "r"), booktabs = TRUE) |>
-  kable_styling(latex_options = c("hold_position", "striped"), full_width = FALSE) |>
-  row_spec(4, bold = TRUE) |>
-  row_spec(5, italic = TRUE)
+# Plain pandoc-native markdown table: converts cleanly to both HTML and typst
+# output without depending on kableExtra's format detection (which does not
+# recognise the custom zhaw-lsfm-typst format and falls back to producing an
+# HTML table, which is what triggered the "Functions that produce HTML output
+# found in document targeting typst output" error).
+knitr::kable(rule_df, align = c("l", "l", "r", "r"), format = "pipe")
 ```
 
 ```{r}
@@ -193,8 +197,6 @@ p_ta_patch <- ggplot(df_patch, aes(x = ta_)) +
 
 Fourteen spatial covariates were assembled on the 25-metre Aargau grid before VIF testing. These are presented below in functional groups. Layers included in the final iSSF model are labelled accordingly. Excluded layers are shown to document the full intermediate output of the pipeline and to provide spatial context for understanding the final resistance surface structure. For all distance rasters, values are in metres measured as Euclidean distance to the nearest cell of the target feature class. For all density and suitability rasters, values range from 0 to 1. Binary barrier and passage rasters contain value 1 where the feature is present and are stored as NoData elsewhere.
 
-------------------------------------------------------------------------
-
 :::: {.content-visible when-format="html"}
 ## Interactive Raster Viewer
 
@@ -203,6 +205,7 @@ The following tabbed maps allow interactive exploration of every spatial layer p
 ```{r}
 #| label: leaflet-setup
 #| include: false
+#| eval: !expr knitr::is_html_output()
 
 # Aggregation factor for leaflet display (~200m from 25m source)
 LF <- 8
@@ -274,13 +277,14 @@ base_groups <- c("Swisstopo (light)", "OpenStreetMap", "Satellite")
 
 ```{r}
 #| label: map-forest
+#| eval: !expr knitr::is_html_output()
 
 leaflet(options = leafletOptions(minZoom = 8)) |>
   addProviderTiles("CartoDB.Positron",   group = "Swisstopo (light)") |>
   addProviderTiles("OpenStreetMap",      group = "OpenStreetMap") |>
   addProviderTiles("Esri.WorldImagery",  group = "Satellite") |>
   addRasterImage(lf_forest, colors = colorNumeric(c("#f5f5e0","#1a5c2e"), 0:1, na.color="transparent"),
-                 opacity = 0.8, group = "Forest Cover (binary) — Aargau") |>
+                 opacity = 0.8, group = "Forest Cover (binary) — Aargau [excluded VIF]") |>
   addRasterImage(lf_fd,  colors = pal_green, opacity = 0.8,
                  group = "Forest Density 50 m — Aargau") |>
   addRasterImage(lf_fdg, colors = pal_green, opacity = 0.8,
@@ -293,7 +297,7 @@ leaflet(options = leafletOptions(minZoom = 8)) |>
                  group = "Forest Density Gradient 1000 m — Zürich") |>
   addLayersControl(
     baseGroups    = base_groups,
-    overlayGroups = c("Forest Cover (binary) — Aargau",
+    overlayGroups = c("Forest Cover (binary) — Aargau [excluded VIF]",
                       "Forest Density 50 m — Aargau",
                       "Forest Density Gradient 1000 m — Aargau",
                       "Dist Forest Edge — Aargau [excluded VIF]",
@@ -301,7 +305,7 @@ leaflet(options = leafletOptions(minZoom = 8)) |>
                       "Forest Density Gradient 1000 m — Zürich"),
     options = layersControlOptions(collapsed = FALSE)
   ) |>
-  hideGroup(c("Forest Cover (binary) — Aargau",
+  hideGroup(c("Forest Cover (binary) — Aargau [excluded VIF]",
               "Forest Density Gradient 1000 m — Aargau",
               "Dist Forest Edge — Aargau [excluded VIF]",
               "Forest Density 50 m — Zürich",
@@ -315,6 +319,7 @@ leaflet(options = leafletOptions(minZoom = 8)) |>
 
 ```{r}
 #| label: map-terrain
+#| eval: !expr knitr::is_html_output()
 
 pal_sl  <- colorNumeric(hcl.colors(100, "YlOrBr"), domain = c(0, 70),   na.color = "transparent")
 pal_tri <- colorNumeric(hcl.colors(100, "YlOrBr"), domain = c(0, 55),   na.color = "transparent")
@@ -342,6 +347,7 @@ leaflet(options = leafletOptions(minZoom = 8)) |>
 
 ```{r}
 #| label: map-water
+#| eval: !expr knitr::is_html_output()
 
 pal_dw  <- colorNumeric(hcl.colors(100, "Blues"), domain = c(0, 3500), na.color = "transparent")
 pal_dlk <- colorNumeric(hcl.colors(100, "Blues"), domain = c(0, 7200), na.color = "transparent")
@@ -378,25 +384,26 @@ leaflet(options = leafletOptions(minZoom = 8)) |>
 
 ```{r}
 #| label: map-infrastructure
+#| eval: !expr knitr::is_html_output()
 
-pal_mr  <- colorNumeric(hcl.colors(100, "Blues"), domain = c(0, 7100), na.color = "transparent")
-pal_sr  <- colorNumeric(hcl.colors(100, "Blues"), domain = c(0, 3250), na.color = "transparent")
-pal_rw  <- colorNumeric(hcl.colors(100, "Blues"), domain = c(0, 7250), na.color = "transparent")
-pal_se  <- colorNumeric(hcl.colors(100, "Blues"), domain = c(0, 7000), na.color = "transparent")
-pal_fr  <- colorNumeric(hcl.colors(100, "Blues"), domain = c(0,16710), na.color = "transparent")
+pal_mr  <- colorNumeric(hcl.colors(100, "Reds"), domain = c(0, 7100), na.color = "transparent")
+pal_sr  <- colorNumeric(hcl.colors(100, "Reds"), domain = c(0, 3250), na.color = "transparent")
+pal_rw  <- colorNumeric(hcl.colors(100, "Reds"), domain = c(0, 7250), na.color = "transparent")
+pal_se  <- colorNumeric(hcl.colors(100, "Reds"), domain = c(0, 7000), na.color = "transparent")
+pal_fr  <- colorNumeric(hcl.colors(100, "Reds"), domain = c(0,16710), na.color = "transparent")
 
 leaflet(options = leafletOptions(minZoom = 8)) |>
   addProviderTiles("CartoDB.Positron",  group = "Swisstopo (light)") |>
   addProviderTiles("OpenStreetMap",     group = "OpenStreetMap") |>
   addProviderTiles("Esri.WorldImagery", group = "Satellite") |>
   addRasterImage(lf_dmr,  colors = pal_mr,  opacity = 0.8,
-                 group = "Dist Main Road — Aargau [β = 0.244]") |>
+                 group = "Dist Main Road — Aargau") |>
   addRasterImage(lf_dsr,  colors = pal_sr,  opacity = 0.8,
-                 group = "Dist Secondary Road — Aargau [β = 0.171]") |>
+                 group = "Dist Secondary Road — Aargau") |>
   addRasterImage(lf_dra,  colors = pal_rw,  opacity = 0.8,
-                 group = "Dist Railway — Aargau [β = 0.505]") |>
+                 group = "Dist Railway — Aargau") |>
   addRasterImage(lf_dse,  colors = pal_se,  opacity = 0.8,
-                 group = "Dist Settlement — Aargau [β = 0.210]") |>
+                 group = "Dist Settlement — Aargau") |>
   addRasterImage(lf_dfr,  colors = pal_fr,  opacity = 0.8,
                  group = "Dist Fenced Road — Aargau [excluded]") |>
   addRasterImage(lf_dmr_zh, colors = pal_mr, opacity = 0.8,
@@ -409,10 +416,10 @@ leaflet(options = leafletOptions(minZoom = 8)) |>
                  group = "Dist Settlement — Zürich") |>
   addLayersControl(
     baseGroups    = base_groups,
-    overlayGroups = c("Dist Main Road — Aargau [β = 0.244]",
-                      "Dist Secondary Road — Aargau [β = 0.171]",
-                      "Dist Railway — Aargau [β = 0.505]",
-                      "Dist Settlement — Aargau [β = 0.210]",
+    overlayGroups = c("Dist Main Road — Aargau",
+                      "Dist Secondary Road — Aargau",
+                      "Dist Railway — Aargau",
+                      "Dist Settlement — Aargau",
                       "Dist Fenced Road — Aargau [excluded]",
                       "Dist Main Road — Zürich",
                       "Dist Secondary Road — Zürich",
@@ -420,7 +427,7 @@ leaflet(options = leafletOptions(minZoom = 8)) |>
                       "Dist Settlement — Zürich"),
     options = layersControlOptions(collapsed = FALSE)
   ) |>
-  hideGroup(c("Dist Secondary Road — Aargau [β = 0.171]",
+  hideGroup(c("Dist Secondary Road — Aargau",
               "Dist Fenced Road — Aargau [excluded]",
               "Dist Main Road — Zürich",
               "Dist Secondary Road — Zürich",
@@ -435,6 +442,7 @@ leaflet(options = leafletOptions(minZoom = 8)) |>
 
 ```{r}
 #| label: map-barriers
+#| eval: !expr knitr::is_html_output()
 
 pal_bin_red   <- colorFactor(c("#e74c3c"), domain = 1, na.color = "transparent")
 pal_bin_blue  <- colorFactor(c("#2980b9"), domain = 1, na.color = "transparent")
@@ -449,35 +457,27 @@ leaflet(options = leafletOptions(minZoom = 8)) |>
                  group = "Highway barriers — Aargau") |>
   addRasterImage(lf_ll,   colors = pal_bin_blue,   opacity = 0.9,
                  group = "Large lakes — Aargau") |>
-  addRasterImage(lf_ls,   colors = pal_bin_orange, opacity = 0.7,
-                 group = "Large settlements — Aargau") |>
   addRasterImage(lf_pa,   colors = pal_bin_green,  opacity = 0.9,
                  group = "Wildlife passages — Aargau") |>
   addRasterImage(lf_hw_zh,  colors = pal_bin_red,    opacity = 0.9,
                  group = "Highway barriers — Zürich") |>
   addRasterImage(lf_ll_zh,  colors = pal_bin_blue,   opacity = 0.9,
                  group = "Large lakes — Zürich") |>
-  addRasterImage(lf_ls_zh,  colors = pal_bin_orange, opacity = 0.7,
-                 group = "Large settlements — Zürich") |>
   addRasterImage(lf_pa_zh,  colors = pal_bin_green,  opacity = 0.9,
                  group = "Wildlife passages — Zürich") |>
   addLayersControl(
     baseGroups    = base_groups,
     overlayGroups = c("Highway barriers — Aargau",
                       "Large lakes — Aargau",
-                      "Large settlements — Aargau",
                       "Wildlife passages — Aargau",
                       "Highway barriers — Zürich",
                       "Large lakes — Zürich",
-                      "Large settlements — Zürich",
                       "Wildlife passages — Zürich"),
     options = layersControlOptions(collapsed = FALSE)
   ) |>
   hideGroup(c("Large lakes — Aargau",
-              "Large settlements — Aargau",
               "Highway barriers — Zürich",
               "Large lakes — Zürich",
-              "Large settlements — Zürich",
               "Wildlife passages — Zürich")) |>
   setView(lng = 8.3, lat = 47.40, zoom = 9) |>
   addLegend(colors = c("#e74c3c","#2980b9","#e67e22","#27ae60"),
@@ -490,6 +490,7 @@ leaflet(options = leafletOptions(minZoom = 8)) |>
 
 ```{r}
 #| label: map-outputs
+#| eval: !expr knitr::is_html_output()
 
 leaflet(options = leafletOptions(minZoom = 8)) |>
   addProviderTiles("CartoDB.Positron",  group = "Swisstopo (light)") |>
@@ -524,11 +525,29 @@ leaflet(options = leafletOptions(minZoom = 8)) |>
 ::::
 
 ::: {.content-visible unless-format="html"}
-The full set of intermediate covariate layers is available only in the interactive HTML version of this report. For the static output, the two maps below show the final products of the resistance surface pipeline: the habitat suitability surface recovered from the fitted iSSF coefficients, and the resistance surface obtained from it through the Keeley transformation, for both Canton Aargau and Canton Zürich.
+Of the fourteen spatial covariates assembled for the resistance surface pipeline, the two maps below show its final products: the habitat suitability surface recovered from the fitted iSSF coefficients, and the resistance surface obtained from it through the Keeley transformation, for both Canton Aargau and Canton Zürich.
 
-![Final habitat suitability and resistance surfaces for Canton Aargau. Left: habitat suitability (0 to 1), with high values indicating landscape preferred during transit movement. Right: resistance under the Keeley transformation with C = 4, where low values are permeable and high values approach impassable.](`r file.path(data_proc, "suitability_resistance_maps_Aargau.png")`)
+```{r}
+#| label: fig-suitability
+#| echo: false
+#| fig-cap: "Final habitat suitability and resistance surfaces for Canton Aargau. Left: habitat suitability (0 to 1), with high values indicating landscape preferred during transit movement. Right: resistance under the Keeley transformation with C = 4, where low values are permeable and high values approach impassable."
+# Copy into the project-local images/ folder so the typst compiler can read it
+# (typst refuses to load files outside its project root, i.e. outside docs/).
+local_png <- file.path("images", "suitability_resistance_maps_Aargau.png")
+file.copy(file.path(data_proc, "suitability_resistance_maps_Aargau.png"), local_png, overwrite = TRUE)
+knitr::include_graphics(local_png)
+```
 
-![Final habitat suitability and resistance surfaces for Canton Zürich, produced by transferring the Aargau-fitted iSSF coefficients onto the Zürich landscape. Left: habitat suitability (0 to 1). Right: resistance under the Keeley transformation with C = 4.](`r file.path(data_proc, "suitability_resistance_maps_Zurich.png")`)
+```{r}
+#| label: fig-suitability-zurich
+#| echo: false
+#| fig-cap: "Final habitat suitability and resistance surfaces for Canton Zürich, produced by transferring the Aargau-fitted iSSF coefficients onto the Zürich landscape. Left: habitat suitability (0 to 1). Right: resistance under the Keeley transformation with C = 4."
+# Copy into the project-local images/ folder so the typst compiler can read it
+# (typst refuses to load files outside its project root, i.e. outside docs/).
+local_png <- file.path("images", "suitability_resistance_maps_Zurich.png")
+file.copy(file.path(data_proc, "suitability_resistance_maps_Zurich.png"), local_png, overwrite = TRUE)
+knitr::include_graphics(local_png)
+```
 :::
 
 ## QGIS Plugin
@@ -537,7 +556,7 @@ The *Wildboar Connectivity (ASF)* plugin was implemented as a QGIS 3.40 extensio
 
 ### Baseline Connectivity Analysis
 
-For the baseline demonstration, the outbreak origin was placed in a forested grid cell north of the Winterthur city centre representative of a scenario in which the disease enters through a wild boar population in that region and disperses in different directions. All five outputs were enabled, with 500 BCRW realisations and 2,000 iSSF-IBMM agents. The analysis completed in under three minutes on a standard laptop.
+For the baseline demonstration, the outbreak origin was placed in a forested grid cell north of the Winterthur city centre representative of a scenario in which the disease enters through a wild boar population in that region and disperses in different directions. All five outputs were enabled, with 2,000 BCRW realisations and 2,000 iSSF-IBMM agents. The analysis completed in under three minutes on a standard laptop.
 
 The LCP corridor analysis connected the outbreak origin to the nearest reachable WILMA habitat clusters via the pre-computed Dijkstra cost grid. The graduated blue styling assigned light sky blue to distant corridors serving high cummulative resistance cost, vivid blue to intermediate connectors, and deep navy to the backbone segments shared by multiple routes and smaller cummulative resistance cost. The paths concentrated in the forested ridgelines and crossed the wildlife overpasses, consistent with the visual pattern of low-resistance cells in the Zürich resistance map.
 
@@ -547,16 +566,14 @@ The continuous infection-risk raster produced three discrete EFSA-aligned zones 
 
 The BCRW density and iSSF-IBMM contamination probability layers broadly corroborated the LCP and pinchpoint structure. The BCRW density surface showed the highest visitation counts along the same corridors identified by the Circuitscape analysis, confirming their role as preferred transit routes. The iSSF-IBMM log10-transformed contamination probability surface showed the steepest probability gradients at the forest-to-infrastructure transitions where resistance increases rapidly.
 
-![Example outputs of the wildboar connectivity plugin for a simulated outbreak origin north of Winterthur. Top left: least-cost path corridors to the 100 nearest low-resistance habitat clusters, styled by cost-distance weight, with thick dark-blue segments indicating near-origin backbone corridors and thin light-blue segments indicating distant, high-cost connections. Top right: infection risk surface derived from an exponential decay function, classified into three zones following EFSA guidelines (high risk \> 0.50, medium risk 0.15–0.50, low risk ≤ 0.15). Bottom left: dispersal corridor probability raster from circuit theory, where bright cells indicate pinchpoints through which movement is concentrated. Bottom right: random-walk visit density from 500 biased correlated random walks, showing the stochastic spread envelope around the outbreak origin.](images/baseline.png)
+![Baseline scenario produced by the Wildboar Connectivity (ASF) plugin for a single hypothetical outbreak origin (red point) in Canton Zürich, run without any fences or overpasses applied. Top left: Outbreak origin shown on the Swissimage basemap. Top right: Least-cost path corridors connecting the origin to the habitat destinations (green points), classed by cumulative edge strength into near-origin backbone, intermediate, and distant segments. Centre left: Infection-risk surface classified into the three EFSA-anchored zones (low, medium, high risk). Centre right: Circuit-theory dispersal corridor probability on a Magma colour ramp, concentrating current density into a small number of bright branches that mark the structurally most important crossings around the origin. Bottom left: Biased correlated random walk visitation density for n = 2,000 realisations, forming a compact, well-defined core directly around the origin that fades toward the edge of the analysis window. Bottom right: iSSF-IBMM contamination probability surface (log10-transformed) for n = 2,000 agents, showing a high-probability zone centred on the origin surrounded by a broader, lower-probability halo across the wider landscape.](images/baseline.png){#fig-plugin-baseline}
 
 ### Scenario Comparison: Virtual Fence Intervention
 
-To demonstrate the scenario comparison functionality, a virtual fence was drawn over a wildlife overpass and a new wildlife overpass was built in the north of winterthur crossing a highway. The fence was rasterized as a two-cell-wide NaN wall in the modified resistance array and the full analysis was rerun without changing the outbreak origin or any other parameter. Both runs used identical settings so that all differences in the output layers can be attributed entirely to the fence modification.
+To demonstrate the scenario comparison functionality, multiple virtual fences were drawn over the wildlife overpasses and a new wildlife overpass was built in the north of winterthur crossing a highway. The fence was rasterized as a two-cell-wide NaN wall in the modified resistance array and the full analysis was rerun without changing the outbreak origin or any other parameter. Both runs used identical settings so that all differences in the output layers can be attributed entirely to the fence modification.
 
-The pinchpoint raster showed a clear rerouting of current density away from the blocked corridor segment. The cumulative flow that previously concentrated at the motorway crossing was redistributed to the new overpass, building an alternative corridor. The LCP backbone similarly shifted away from the blocked crossing to the new generated one, increasing connectivity to the south. The infection-risk zone contracted asymmetrically on the side of the fence facing away from the outbreak origin, indicating reduced modelled reachability in the fenced direction.
+The pinchpoint raster showed a clear rerouting of current density away from the blocked corridor segments. The cumulative flow that previously concentrated at the motorway crossing was redistributed to the new overpass, building an alternative corridor. The LCP backbone similarly shifted away from the blocked crossing to the new generated one, increasing connectivity to the south. The area at risk of infection shrank asymmetrically on the side of the newly erected fences and expanded across the newly constructed wildlife overpass.
 
-![Effect of landscape modifications on dispersal corridors and pinchpoints for a simulated outbreak north of Winterthur. Left column shows the baseline scenario without interventions, right column shows the same outbreak after placement of a fence (red line) and a wildlife overpass (blue dot) on the resistance surface. Top row: least-cost path corridors to the 100 nearest habitat destinations, styled by cost-distance weight. The fence severs several southward corridor branches in the modified scenario, while the overpass maintains connectivity across an otherwise impassable barrier. Bottom row: circuit-theory pinchpoint rasters showing dispersal corridor probability. The fence visibly reduces current flow along the blocked routes, and the overpass creates a new high-current channel at its location, demonstrating that both barrier and crossing interventions are correctly propagated through the resistance grid before analysis.](images/lcp_circuit_fence.png)
+![Comparison of the baseline scenario (left column) with a modified scenario in which four fences and one wildlife overpass were placed on impassable barriers and existing wildlife overpasses near the outbreak origin (shown as red lines and blue points). From top to bottom, the rows show the least-cost path corridors, the circuit-theory dispersal corridor probability, the infection-risk zones, the biased correlated random walk visitation density (n = 2,000), and the iSSF-IBMM contamination probability surface (n = 2,000 agents). Adding the fences visibly reshapes every downstream output along the affected edge: the corridor network and the medium-risk zone are truncated to the south and southwest, the circuit-theory current is rerouted into a narrower channel north of the origin and its peak probability rises from 0.00409 to 0.005633, and the random walk density is compressed into a smaller permeable area with its peak visitation count rising from 291 to 333. Because the same number of walkers and agents is now confined to less of the landscape, the comparison illustrates how a single barrier placement concentrates rather than simply blocks movement, and how the overpass alone is building a new corridor that crosses the highway.](images/with_fence.png){#fig-comparison}
 
-![Effect of landscape modifications on infection risk and individual-based movement model (IBMM) outputs for a simulated outbreak north of Winterthur. Left column shows the baseline scenario, right column shows the modified scenario with a fence (red line) cutting across the southern corridor and a wildlife overpass (blue dot) placed on a barrier. Top row: infection risk surfaces classified by exponential decay into three zones following EFSA guidelines. The fence reduces the southward extent of the medium-risk zone, while the overpass opens a new low-risk finger of connectivity in that direction. Bottom row: iSSF-IBMM contamination probability surfaces (log\\textsubscript{10} scale, 2000 agents). The fence visibly suppresses agent penetration into the southern urban fringe, and the overpass enables a new dispersal channel through the previously impassable barrier, reflected in the shifted spread envelope in the modified scenario.](images/risk_ibmm_fence.png)
-
-The scenario comparison illustrates the core purpose of the plugin: rather than producing a single static map, it enables iterative exploration of management alternatives within the same GIS session. A wildlife manager can test different fence alignments, observe how each one redirects the modelled corridor network, and compare the resulting infection-risk zones, all without leaving the QGIS environment or re-running any preprocessing steps.
+The scenario comparison illustrates the core purpose of the plugin. It enables iterative exploration of management alternatives within the same GIS session. A wildlife manager can test different fence alignments, observe how each one redirects the modelled corridor network, and compare the resulting wild boar corridors and infection-risk zones, all without leaving the QGIS environment or re-running any preprocessing steps.

@@ -11,7 +11,7 @@ book:
   downloads: pdf
   chapters:
     - file: index.qmd
-      text: "Titelseite"
+      text: "Front Page"
     - 1-zusammenfassung.qmd
     - 1b-abkuerzungen.qmd
     - 2-einleitung.qmd
@@ -52,4 +52,5 @@ supervisors:
 
 format:
   zhaw-lsfm-html: default
-  zhaw-lsfm-typst: default
+  zhaw-lsfm-typst:
+    prefer-html: true

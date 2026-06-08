@@ -21,7 +21,11 @@ import json
 import os
 import sys
 
-# Windows / QGIS / NumPy stderr workaround. Must run BEFORE numpy.
+# Windows / QGIS / NumPy stderr workaround. Must run BEFORE numpy is
+# imported anywhere in the call chain (including indirectly, e.g. via the
+# analysis task module below). When QGIS is launched without a console,
+# sys.stderr is None on Windows, and NumPy crashes on import the moment it
+# tries to write a warning to it. Swapping in a no-op stream avoids that.
 if sys.stderr is None:
     class _DummyStderr:
         def write(self, *a, **kw): pass
@@ -75,7 +79,10 @@ class WildboarConnectivity:
         self.canvas = iface.mapCanvas()
         self.plugin_dir = os.path.dirname(__file__)
 
-        # i18n scaffold.
+        # i18n scaffold: load a translation file matching the user's QGIS
+        # locale if one ships with the plugin (none currently does, so this
+        # is a no-op today, but it means translations can be dropped in
+        # later without touching this code).
         locale = (QSettings().value("locale/userLocale") or "en")[0:2]
         qm = os.path.join(self.plugin_dir, "i18n",
                           f"WildboarConnectivity_{locale}.qm")
@@ -117,15 +124,26 @@ class WildboarConnectivity:
         self.actions.append(action)
 
     def unload(self):
+        """Called by QGIS when the plugin is disabled or reloaded.
+
+        Removes the toolbar/menu entries, clears any on-canvas markers or
+        rubber bands left by the map tools, and removes every layer the
+        plugin added so a disable/re-enable cycle leaves a clean project.
+        """
         for action in self.actions:
             self.iface.removePluginMenu(self.menu, action)
             self.iface.removeToolBarIcon(action)
         for tool in (self.origin_tool, self.overpass_tool, self.fence_tool):
             if tool is not None:
                 try:
+                    # PointSelectionTool exposes clear_marker(), while
+                    # FenceDrawingTool exposes reset() instead - pick
+                    # whichever the tool actually has.
                     tool.clear_marker() if hasattr(tool, "clear_marker") \
                         else tool.reset()
                 except Exception:
+                    # Tools may already be torn down by QGIS at this point;
+                    # failing to clear a marker should never block unload.
                     pass
         try:
             remove_all_wildboar_layers(keep_basemap=False)
@@ -134,6 +152,11 @@ class WildboarConnectivity:
 
     # -----------------------------------------------------------------
     def run(self):
+        """Show the plugin dialog, building it (and the map tools and
+        signal connections) the first time the toolbar icon is clicked.
+        Subsequent clicks just re-show the existing dialog so the user's
+        picked raster, fences and overpasses are preserved between runs.
+        """
         if self.dlg is None:
             self.dlg = WildboarConnectivityDialog(self.iface.mainWindow())
             self.dlg.cmbRaster.setFilters(QgsMapLayerProxyModel.RasterLayer)
@@ -170,6 +193,9 @@ class WildboarConnectivity:
     # Tool activation
     # -----------------------------------------------------------------
     def _activate_tool(self, which):
+        """Switch the map canvas into capture mode for one of the three
+        interactive tools and update the status label so the user knows
+        what action is expected of them."""
         if which == "origin":
             self.dlg.lblStatus.setText("Click on the map - that is the outbreak origin.")
             self.origin_tool.activate_for_role("origin")
@@ -264,8 +290,14 @@ class WildboarConnectivity:
     # Run
     # -----------------------------------------------------------------
     def _on_run_clicked(self):
+        """Validate the dialog state, prepare everything the background
+        task needs (origin point, fences/overpasses, read window, optional
+        habitat polygons - all reprojected into the raster's CRS), then
+        hand off to AsfConnectivityTask so the heavy analysis runs without
+        freezing the QGIS UI."""
         raster = self.dlg.cmbRaster.currentLayer()
 
+        # ---- Basic input validation -----------------------------------
         if raster is None or not isinstance(raster, QgsRasterLayer):
             self._warn("Select a resistance raster.")
             return

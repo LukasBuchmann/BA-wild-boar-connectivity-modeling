@@ -13,8 +13,16 @@ is-index: true   # prevents the chapter title from appearing twice on this page
 <!-- Typst: render the table of contents here (hidden in HTML, handled by sidebar) -->
 ::: {.content-hidden when-format="html"}
 
-# Inhaltsverzeichnis {.unnumbered .unlisted}
+# Table of Contents {.unnumbered .unlisted}
 
 {{< table-of-contents >}}
+
+# List of Figures {.unnumbered .unlisted}
+
+{{< list-of-figures >}}
+
+# List of Tables {.unnumbered .unlisted}
+
+{{< list-of-tables >}}
 
 :::

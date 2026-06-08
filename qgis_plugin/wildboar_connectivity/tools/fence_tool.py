@@ -101,6 +101,10 @@ class FenceDrawingTool(QgsMapTool):
 
     # ------------------------------------------------------------------
     def __del__(self):
+        # Remove the rubber band from the canvas scene so it does not
+        # linger as a stray graphics item once this tool is discarded.
+        # Wrapped in try/except because during QGIS shutdown the canvas
+        # scene can already be gone, which would otherwise raise here.
         try:
             self.canvas.scene().removeItem(self.rb)
         except Exception:

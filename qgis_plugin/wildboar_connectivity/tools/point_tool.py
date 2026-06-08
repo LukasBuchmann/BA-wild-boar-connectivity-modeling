@@ -72,6 +72,10 @@ class PointSelectionTool(QgsMapToolEmitPoint):
             self._previous_tool = None
 
     def deactivate(self):
+        # Explicit override so QGIS always sees this tool as overriding
+        # deactivate(), even though the base implementation is sufficient
+        # here. Keeps the door open for cleanup logic later without having
+        # to remember to add the override first.
         super().deactivate()
 
     # ------------------------------------------------------------------

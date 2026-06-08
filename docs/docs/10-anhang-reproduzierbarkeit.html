@@ -117,7 +117,7 @@ ul.task-list li input[type="checkbox"] {
         <li class="sidebar-item">
   <div class="sidebar-item-container"> 
   <a href="./index.html" class="sidebar-item-text sidebar-link">
- <span class="menu-text">Titelseite</span></a>
+ <span class="menu-text">Front Page</span></a>
   </div>
 </li>
         <li class="sidebar-item">
@@ -165,7 +165,7 @@ ul.task-list li input[type="checkbox"] {
         <li class="sidebar-item">
   <div class="sidebar-item-container"> 
   <a href="./references.html" class="sidebar-item-text sidebar-link">
- <span class="menu-text">Literaturverzeichnis</span></a>
+ <span class="menu-text">Bibliography</span></a>
   </div>
 </li>
         <li class="sidebar-item sidebar-item-section">
@@ -230,7 +230,7 @@ ul.task-list li input[type="checkbox"] {
 <p>This thesis follows the FAIR principles for data and code management specified in the ZHAW Statement of Reproducibility.</p>
 <section id="code-and-workflow" class="level2" data-number="D.1">
 <h2 data-number="D.1" class="anchored" data-anchor-id="code-and-workflow"><span class="header-section-number">D.1</span> Code and Workflow</h2>
-<p>The complete analytical workflow is encoded in two Quarto notebooks. The resistance surface pipeline, from raw telemetry to the final 25-metre resistance raster, is contained in <code>scripts/01_create_resistance_surface.ipynb</code>. All connectivity analyses are contained in <code>scripts/02_connectivity.ipynb</code>. Given the same input data and software environment, both notebooks produce identical outputs deterministically. The QGIS plugin <em>Wildboar Connectivity (ASF)</em> is distributed as a standard QGIS Python package with a <code>metadata.txt</code> manifest and can be installed through the QGIS plugin manager.</p>
+<p>The analytical workflow is split across two components. The resistance surface pipeline, from raw telemetry to the final 25-metre resistance raster, is contained in the single Quarto notebook <code>scripts/01_create_resistance_surface.ipynb</code>. Given the same input data and software environment, this notebook produces identical outputs deterministically. All connectivity analyses, including the infection-risk kernel, the biased correlated random walk, and the iSSF-based individual movement model, are implemented directly in the QGIS plugin <em>Wildboar Connectivity (ASF)</em>. The plugin is distributed as a standard QGIS Python package with a <code>metadata.txt</code> manifest and can be installed through the QGIS plugin manager.</p>
 </section>
 <section id="software-environment" class="level2" data-number="D.2">
 <h2 data-number="D.2" class="anchored" data-anchor-id="software-environment"><span class="header-section-number">D.2</span> Software Environment</h2>
@@ -242,7 +242,7 @@ ul.task-list li input[type="checkbox"] {
 </section>
 <section id="data-availability" class="level2" data-number="D.4">
 <h2 data-number="D.4" class="anchored" data-anchor-id="data-availability"><span class="header-section-number">D.4</span> Data Availability</h2>
-<p>All base geodata are drawn from publicly accessible Swiss federal services. The GPS telemetry and the permanent ASP fence shapefile were provided by the project partners and are not publicly redistributable. See <span class="quarto-unresolved-ref">?tbl-datasets</span> in the data sources appendix for the full list of inputs and providers.</p>
+<p>All base geodata are drawn from publicly accessible Swiss federal services. The GPS telemetry and the permanent ASP fence shapefile were provided by the project partners and are not publicly redistributable. See <a href="7-anhang-rohdaten.html#tbl-datasets" class="quarto-xref">Table&nbsp;<span>A.1</span></a> in the data sources appendix for the full list of inputs and providers.</p>
 
 
 </section>

@@ -160,6 +160,11 @@ def run_one_to_all(resistance: np.ndarray,
         focal[sink_mask & ~source_mask] = 2.0
         _write_ascii_grid(focal, transform, focal_path)
 
+        # Circuitscape is configured entirely through this INI file rather
+        # than function arguments, since it is invoked as an external Julia
+        # process. "pairwise" mode with two focal regions (source/sink, see
+        # the focal raster above) reduces the general all-pairs solve to the
+        # single source-to-sink current map this plugin needs.
         ini = f"""[Circuitscape Mode]
 data_type = raster
 scenario = pairwise
@@ -213,13 +218,16 @@ write_volt_maps = False
             raise CircuitscapeJlError(
                 f"Circuitscape.jl failed: {result.stderr.strip() or result.stdout[-500:]}")
 
-        # Find the cumulative current map (file name depends on CS
-        # version; try common patterns).
+        # Circuitscape names its output file differently depending on the
+        # version and on whether it ran in "cumulative" or "pairwise" mode,
+        # so try the two known patterns first ...
         candidates = [
             f"{out_prefix}_cum_curmap.asc",
             f"{out_prefix}_curmap_1_2.asc",
         ]
-        # Fallback: any *curmap*.asc in tmpdir
+        # ... and fall back to scanning the tempdir for anything that looks
+        # like a current map, so an unexpected naming scheme in a future
+        # Circuitscape release does not silently break the pipeline.
         for f in os.listdir(tmpdir):
             if f.endswith(".asc") and "curmap" in f.lower():
                 candidates.append(os.path.join(tmpdir, f))

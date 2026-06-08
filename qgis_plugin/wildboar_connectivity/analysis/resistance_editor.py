@@ -90,15 +90,25 @@ def _xy_to_rc(transform, x, y):
 
 
 def _dilate_disc(mask: np.ndarray, radius: int) -> np.ndarray:
-    """Morphological dilation with a disc structuring element (pure numpy)."""
+    """Morphological dilation with a disc structuring element (pure numpy).
+
+    Avoids a scipy dependency just for this one operation. The idea: for
+    every offset (dr, dc) inside the disc, OR a shifted copy of the mask
+    onto the output. The min/max juggling below works out the overlap
+    between the shifted and unshifted arrays so the shift can be done with
+    plain slicing instead of np.roll (which would wrap around the edges).
+    """
     out = mask.copy()
     rows, cols = mask.shape
     for dr in range(-radius, radius + 1):
         for dc in range(-radius, radius + 1):
             if dr * dr + dc * dc > radius * radius:
                 continue
+            # Destination window in `out` ...
             r0, r1 = max(0, dr), rows + min(0, dr)
             c0, c1 = max(0, dc), cols + min(0, dc)
+            # ... and the matching source window in `mask`, shifted by
+            # (-dr, -dc) so the two windows line up cell for cell.
             src_r0 = max(0, -dr);  src_r1 = rows + min(0, -dr)
             src_c0 = max(0, -dc);  src_c1 = cols + min(0, -dc)
             out[r0:r1, c0:c1] |= mask[src_r0:src_r1, src_c0:src_c1]

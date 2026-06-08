@@ -70,6 +70,9 @@ def _correct_index_for_z(z: int) -> int:
 
 def add_wildboar_layer(layer, z):
     """Add *layer* to the project and insert it at the correct z-position."""
+    # Imported here rather than at module level: QgsMessageLog/Qgis are only
+    # needed for the one log line below, so keeping the import local avoids
+    # pulling them in for callers that never hit this code path.
     from qgis.core import Qgis, QgsMessageLog
     project = QgsProject.instance()
     layer.setCustomProperty(WB_ZORDER_KEY, int(z))
@@ -123,6 +126,8 @@ def remove_all_wildboar_layers(keep_basemap: bool = False):
     keep_basemap : bool
         If True, the Swissimage basemap layer is preserved.
     """
+    # See the note in add_wildboar_layer() above: local import keeps the
+    # logging dependency out of the module's hot import path.
     from qgis.core import Qgis, QgsMessageLog
     project = QgsProject.instance()
 

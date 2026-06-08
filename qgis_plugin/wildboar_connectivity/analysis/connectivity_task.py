@@ -117,8 +117,14 @@ def simulate_ibmm(
 
     rows, cols = hab_suitability.shape
     cellsize_m  = float(abs(win_tf.a))
+    # The gamma step-length kernel is fitted in metres (see the iSSF
+    # notebook); convert its scale to pixels once so every draw below can
+    # stay in raster (row, col) space.
     sl_scale_px = IBMM_SL_GAMMA_SCALE_M / cellsize_m
 
+    # Suitability doubles as the step-selection weight surface: agents are
+    # pulled towards better habitat. Walls and NoData get weight 0 so an
+    # agent can never "choose" to step onto an impassable cell.
     hs = hab_suitability.astype(np.float64, copy=True)
     hs[~np.isfinite(hs)] = 0.0
     hs[hs < 0.0] = 0.0
@@ -130,10 +136,16 @@ def simulate_ibmm(
     n_starts = len(orr)
 
     for agent_idx in range(n_agents):
+        # Cancellation is checked every 100 agents rather than every
+        # agent or every step - frequent enough to keep the UI responsive
+        # without the overhead of calling back into Qt on every iteration.
         if cancel_check is not None and agent_idx % 100 == 0:
             if cancel_check():
                 break
 
+        # Each agent's lifespan is drawn from the ASF infectious-period
+        # distribution and converted into a step budget via the assumed
+        # number of active dispersal steps per day, capped for safety.
         life_days   = rng.gamma(ASF_IP_GAMMA_SHAPE, ASF_IP_GAMMA_SCALE_DAYS)
         agent_steps = min(
             int(round(life_days * ASF_ACTIVE_STEPS_PER_DAY)),
@@ -142,21 +154,33 @@ def simulate_ibmm(
         if agent_steps < 1:
             agent_steps = 1
 
+        # Start at a random cell in the source disc with a random initial
+        # heading - the agent has no movement history yet to bias it.
         k0 = int(rng.integers(0, n_starts))
         r, c = int(orr[k0]), int(occ[k0])
         heading = float(rng.uniform(0.0, 2.0 * np.pi))
 
         for _ in range(agent_steps):
+            # Agents that wander outside the auto-detected AOI stop being
+            # tracked - beyond that boundary the cost surface (and thus
+            # the contamination estimate) is no longer considered reliable.
             if aoi_mask is not None and not aoi_mask[r, c]:
                 break
 
             visit[r, c] += 1.0
 
+            # Draw IBMM_N_CANDIDATES possible next steps from the fitted
+            # iSSF movement kernel: step length ~ Gamma, turning angle ~
+            # von Mises around the current heading (so the walk is
+            # correlated, not memoryless).
             sls  = rng.gamma(IBMM_SL_GAMMA_SHAPE, sl_scale_px,
                              size=IBMM_N_CANDIDATES)
             tas  = rng.vonmises(0.0, IBMM_KAPPA, size=IBMM_N_CANDIDATES)
             dirs = heading + tas
 
+            # Convert each candidate (length, absolute direction) into a
+            # target cell. Row decreases northward, hence the minus sign
+            # on the sine term (raster rows count down, not up).
             nc   = c + sls * np.cos(dirs)
             nr   = r - sls * np.sin(dirs)
             nc_i = np.round(nc).astype(np.intp)
@@ -167,6 +191,10 @@ def simulate_ibmm(
             if not valid.any():
                 break
 
+            # Step-selection: pick one candidate with probability
+            # proportional to the habitat suitability at its endpoint.
+            # Out-of-window candidates get weight 0 via nr_safe/nc_safe so
+            # they cannot be indexed out of bounds nor selected.
             nr_safe = np.where(valid, nr_i, 0).astype(np.intp)
             nc_safe = np.where(valid, nc_i, 0).astype(np.intp)
             w = np.where(valid, hs[nr_safe, nc_safe], 0.0)
@@ -180,12 +208,17 @@ def simulate_ibmm(
             if not valid[k]:
                 break
 
+            # The realised heading becomes the reference direction for the
+            # next step's turning angle - this is what makes the walk
+            # "correlated" rather than a fresh random draw each time.
             heading = float(np.arctan2(
                 -(float(nr_i[k]) - r),
                 float(nc_i[k]) - c,
             ))
             r, c = int(nr_i[k]), int(nc_i[k])
 
+    # Contamination probability per cell: fraction of all agents that
+    # ever visited it, which is the standard IBMM output metric.
     prob = visit / max(n_agents, 1)
     return prob.astype(np.float32)
 
@@ -443,11 +476,17 @@ class AsfConnectivityTask(QgsTask):
         search window.
         """
         rows, cols = arr.shape
+        # Clamp the click to the window first - a click just outside the
+        # analysis window should still snap to the nearest passable cell
+        # inside it, rather than failing outright.
         rc = max(0, min(rows - 1, r0))
         cc = max(0, min(cols - 1, c0))
         if np.isfinite(arr[rc, cc]):
             return (rc, cc)
 
+        # Crop a square search window around the click and scan it for
+        # the closest finite-resistance cell (Euclidean distance in
+        # pixels). Cropping first keeps this cheap even on large rasters.
         r1 = max(0, rc - max_radius_cells)
         r2 = min(rows, rc + max_radius_cells + 1)
         c1 = max(0, cc - max_radius_cells)
@@ -498,6 +537,12 @@ class AsfConnectivityTask(QgsTask):
     # AOI boundary cells - used as the Circuit-theory sink.
     # -----------------------------------------------------------------
     def _aoi_boundary_mask(self):
+        # A cell is on the boundary if it is inside the AOI but has at
+        # least one of its four direct neighbours outside it. Each of the
+        # four arrays below is the AOI shifted by one cell in one
+        # direction (built with plain slicing, not np.roll, so nothing
+        # wraps around the grid edges); OR-ing them together and masking
+        # with `aoi` keeps only the inside cells that touch an outside one.
         aoi = self.aoi_mask
         if aoi is None:
             return None
@@ -1109,7 +1154,12 @@ class AsfConnectivityTask(QgsTask):
             Gamma(ASF_IP_GAMMA_SHAPE, ASF_IP_GAMMA_SCALE_DAYS) × steps/day,
             representing the time from infection to death (EFSA 2018).
           - At each step selects the next cell from IBMM_N_CANDIDATES
-            candidates proportional to 1/resistance (the iSSF selection rule).
+            candidates with probability proportional to the habitat
+            suitability at each candidate's endpoint (the iSSF selection
+            rule). Suitability is recovered from the resistance raster via
+            the inverse Keeley transformation just below, so in effect
+            this favours low-resistance cells without needing the original
+            suitability layer at runtime.
         Output: contamination-probability raster = fraction of agents that
         visit each cell.
         """
@@ -1186,9 +1236,17 @@ class AsfConnectivityTask(QgsTask):
     # Mask + crop + write helper
     # =================================================================
     def _mask_crop_write_raster(self, grid, win_tf, prefix):
-        """Apply AOI + NoData mask, crop tightly, save GeoTIFF."""
+        """Apply AOI + NoData mask, crop tightly, save GeoTIFF.
+
+        Shared by every analysis output (risk, pinchpoints, BCRW, IBMM) so
+        they all end up cropped to the same footprint and use the same
+        -9999 NoData convention, which keeps them trivially comparable
+        and overlay-able in QGIS.
+        """
         grid = grid.astype(np.float32, copy=True)
 
+        # A cell is kept only if it is both inside the reachable AOI and
+        # not a wall (NaN in the source resistance raster).
         if self.aoi_mask is not None and self.aoi_mask.shape == grid.shape:
             inside = self.aoi_mask
         else:
@@ -1199,6 +1257,9 @@ class AsfConnectivityTask(QgsTask):
 
         grid[~inside] = np.nan
 
+        # Crop to the tight bounding box of the kept cells so the output
+        # GeoTIFF is not padded with a border of NoData - smaller files,
+        # faster rendering, and a cleaner extent in the QGIS layer panel.
         v_rows = np.where(inside.any(axis=1))[0]
         v_cols = np.where(inside.any(axis=0))[0]
         if not v_rows.size or not v_cols.size:
@@ -1209,6 +1270,7 @@ class AsfConnectivityTask(QgsTask):
         out_tf = window_transform(Window(c0, r0, c1 - c0, r1 - r0), win_tf)
         out_h, out_w = grid.shape
 
+        # GeoTIFF uses a numeric NoData sentinel rather than NaN.
         out_arr = np.where(np.isnan(grid), -9999.0, grid).astype(np.float32)
         out_path = os.path.join(
             tempfile.gettempdir(),
@@ -1329,6 +1391,14 @@ class AsfConnectivityTask(QgsTask):
             prov.addFeature(f)
         layer.updateExtents()
 
+        # Break the corridor lines into three traffic classes for the
+        # graduated renderer below. We mix a tertile split (q33/q66) with
+        # a floor based on the busiest corridor (max_t), because a pure
+        # tertile split looks wrong when most corridors carry almost no
+        # traffic and only a handful of "backbone" routes dominate - the
+        # floor keeps the low/medium boundary from sitting too close to
+        # zero in that common case. The max_t <= 0 branch only protects
+        # against a degenerate all-zero traffic list.
         traffics = sorted(float(p["traffic"]) for p in polys)
         max_t = traffics[-1] if traffics else 1.0
         if max_t <= 0:
@@ -1388,6 +1458,14 @@ class AsfConnectivityTask(QgsTask):
     # =================================================================
     @staticmethod
     def _apply_singleband_ramp(rlayer, ramp_name="Magma"):
+        """Colour a continuous output raster with a perceptually uniform ramp.
+
+        Used for the pinchpoint, walk-density and IBMM rasters, where the
+        interesting signal usually sits in a narrow value range with a few
+        extreme outliers. Stretching the ramp between the 2nd and 98th
+        percentile (rather than the true min/max) keeps those outliers from
+        washing out the colour contrast across the rest of the raster.
+        """
         from qgis.core import (
             QgsSingleBandPseudoColorRenderer,
             QgsColorRampShader,
@@ -1395,6 +1473,11 @@ class AsfConnectivityTask(QgsTask):
             QgsStyle,
         )
         try:
+            # Reading the pixels directly with rasterio gives us the exact
+            # percentile stretch we want. If that fails for any reason
+            # (e.g. the file briefly locked while QGIS is still loading it),
+            # fall back to QGIS's own band statistics with a plain min/max
+            # stretch - less ideal, but always available.
             with rasterio.open(rlayer.source()) as ds:
                 data = ds.read(1, masked=True)
             valid = data.compressed()

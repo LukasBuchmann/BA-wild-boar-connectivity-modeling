@@ -166,7 +166,7 @@ window.Quarto = {
         <li class="sidebar-item">
   <div class="sidebar-item-container"> 
   <a href="./index.html" class="sidebar-item-text sidebar-link">
- <span class="menu-text">Titelseite</span></a>
+ <span class="menu-text">Front Page</span></a>
   </div>
 </li>
         <li class="sidebar-item">
@@ -214,7 +214,7 @@ window.Quarto = {
         <li class="sidebar-item">
   <div class="sidebar-item-container"> 
   <a href="./references.html" class="sidebar-item-text sidebar-link">
- <span class="menu-text">Literaturverzeichnis</span></a>
+ <span class="menu-text">Bibliography</span></a>
   </div>
 </li>
         <li class="sidebar-item sidebar-item-section">
@@ -350,7 +350,7 @@ Figure&nbsp;2.3: Schematic of the cost-distance infection-risk kernel. Risk deca
 </section>
 <section id="biased-correlated-random-walk" class="level3" data-number="2.2.4">
 <h3 data-number="2.2.4" class="anchored" data-anchor-id="biased-correlated-random-walk"><span class="header-section-number">2.2.4</span> Biased Correlated Random Walk</h3>
-<p>A biased correlated random walk (BCRW) models movement as discrete steps shaped by two forces: directional memory, which correlates successive steps, and an environmental bias toward low-cost terrain <span class="citation" data-cites="turchin1998 codling2008">(<a href="#ref-turchin1998" role="doc-biblioref">Turchin 1998</a>; <a href="#ref-codling2008" role="doc-biblioref">Codling et al. 2008</a>)</span>. Directional persistence is described by the von Mises distribution, where the probability of a turn <span class="math inline">\(\theta\)</span> is proportional to <span class="math inline">\(\exp(\kappa \cos\theta)\)</span> and the concentration <span class="math inline">\(\kappa\)</span> controls how strongly the walker continues in its current direction. Weighting each candidate step by the inverse of destination resistance and step length adds the cost bias. As the number of walks grows, the BCRW visit density converges toward the circuit-theory current map under the Randomized Shortest Paths equivalence <span class="citation" data-cites="panzacchi2016">(<a href="#ref-panzacchi2016" role="doc-biblioref"><strong>panzacchi2016?</strong></a>)</span>, so the two methods estimate the same quantity by different means. In practice this limit is reached only with very many walks, which makes the BCRW a useful complementary diagnostic rather than a replacement for circuit theory.</p>
+<p>A biased correlated random walk (BCRW) models movement as discrete steps shaped by two forces: directional memory, which correlates successive steps, and an environmental bias toward low-cost terrain <span class="citation" data-cites="turchin1998 codling2008">(<a href="#ref-turchin1998" role="doc-biblioref">Turchin 1998</a>; <a href="#ref-codling2008" role="doc-biblioref">Codling et al. 2008</a>)</span>. Directional persistence is described by the von Mises distribution, where the probability of a turn <span class="math inline">\(\theta\)</span> is proportional to <span class="math inline">\(\exp(\kappa \cos\theta)\)</span> and the concentration <span class="math inline">\(\kappa\)</span> controls how strongly the walker continues in its current direction. Weighting each candidate step by the inverse of destination resistance and step length adds the cost bias. As the number of walks grows, the BCRW visit density converges toward the circuit-theory current map under the Randomized Shortest Paths equivalence <span class="citation" data-cites="panzacchi2016">(<a href="#ref-panzacchi2016" role="doc-biblioref">Panzacchi et al. 2016</a>)</span>, so the two methods estimate the same quantity by different means. In practice this limit is reached only with very many walks, which makes the BCRW a useful complementary diagnostic rather than a replacement for circuit theory.</p>
 <div class="cell">
 <div class="cell-output-display">
 <div id="fig-bcrw-schematic" class="quarto-float quarto-figure quarto-figure-center anchored">
@@ -435,6 +435,9 @@ McRae, Brad H., Brett G. Dickson, Timothy H. Keitt, and Viral B. Shah. 2008. <sp
 </div>
 <div id="ref-morelle2015" class="csl-entry" role="listitem">
 Morelle, Kevin, Tomasz Podgórski, Céline Prévot, Oliver Keuling, François Lehaire, and Philippe Lejeune. 2015. <span>“Towards Understanding Wild Boar <span class="nocase">Sus scrofa</span> Movement: A Synthetic Movement Ecology Approach.”</span> <em>Mammal Review</em> 45 (1): 15–29. <a href="https://doi.org/10.1111/mam.12028">https://doi.org/10.1111/mam.12028</a>.
+</div>
+<div id="ref-panzacchi2016" class="csl-entry" role="listitem">
+Panzacchi, Manuela, Bram Van Moorter, Olav Strand, et al. 2016. <span>“Predicting the Continuum Between Corridors and Barriers to Animal Movements Using Step Selection Functions and Randomized Shortest Paths.”</span> <em>Journal of Animal Ecology</em> 85 (1): 32–42. <a href="https://doi.org/10.1111/1365-2656.12386">https://doi.org/10.1111/1365-2656.12386</a>.
 </div>
 <div id="ref-podgorski2013" class="csl-entry" role="listitem">
 Podgórski, Tomasz, Grzegorz Baś, Bogumiła Jędrzejewska, et al. 2013. <span>“Spatiotemporal Behavioral Plasticity of Wild Boar (<span class="nocase">Sus scrofa</span>) Under Contrasting Conditions of Human Pressure: Primeval Forest and Metropolitan Area.”</span> <em>Journal of Mammalogy</em> 94 (1): 109–19. <a href="https://doi.org/10.1644/12-MAMM-A-038.1">https://doi.org/10.1644/12-MAMM-A-038.1</a>.

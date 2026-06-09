@@ -30,6 +30,14 @@ bibliography: references.bib
 lang: en
 prefer-html: true
 
+# Number figures/tables continuously across the whole document (1..N) in both
+# HTML and PDF, rather than per-chapter. For the typst PDF this is also enforced
+# by a counter-restore rule in index.qmd (see the {=typst} block there), which
+# cancels Quarto's per-chapter counter reset that the custom zhaw-lsfm template
+# would otherwise render without a chapter prefix (causing duplicate "Figure 1").
+crossref:
+  chapters: false
+
 institut: "Institute for Computational Life Sciences"
 keywords: "wild boar, Sus scrofa, African swine fever, landscape connectivity, resistance surface, circuit theory, step-selection function, QGIS plugin, Canton Zürich"
 confidential: false

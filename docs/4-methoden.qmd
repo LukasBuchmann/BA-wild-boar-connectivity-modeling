@@ -48,7 +48,7 @@ $$\eta = \sum_k \hat{\beta}_k \cdot x_{k,\text{scaled}},$$
 
 This predictor was normalized to a habitat suitability surface $S \in [0,1]$ using local min-max scaling. Finally, suitability was transformed into a resistance surface using the negative exponential function:
 
-$$R = \exp\!\left(C \cdot (1 - S)\right), \qquad C = 4,$$
+$$R = \exp\left(C \cdot (1 - S)\right), \qquad C = 4,$$
 
 A scaling constant of $C = 4$ was applied [@fischer2024], yielding a theoretical resistance range from 1 for the optimal habitat to approximately 54.6 for the least preferred.
 

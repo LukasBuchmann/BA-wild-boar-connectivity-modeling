@@ -243,10 +243,10 @@ window.Quarto = {
     <h2 id="toc-title">Table of contents</h2>
    
   <ul>
-  <li><a href="#final-issf-coefficients" id="toc-final-issf-coefficients" class="nav-link active" data-scroll-target="#final-issf-coefficients"><span class="header-section-number">B.1</span> Final iSSF Coefficients</a></li>
-  <li><a href="#variable-selection-record" id="toc-variable-selection-record" class="nav-link" data-scroll-target="#variable-selection-record"><span class="header-section-number">B.2</span> Variable Selection Record</a></li>
-  <li><a href="#plugin-analysis-parameters" id="toc-plugin-analysis-parameters" class="nav-link" data-scroll-target="#plugin-analysis-parameters"><span class="header-section-number">B.3</span> Plugin Analysis Parameters</a></li>
-  <li><a href="#reproducing-the-statistical-output" id="toc-reproducing-the-statistical-output" class="nav-link" data-scroll-target="#reproducing-the-statistical-output"><span class="header-section-number">B.4</span> Reproducing the Statistical Output</a></li>
+  <li><a href="#final-issf-coefficients" id="toc-final-issf-coefficients" class="nav-link active" data-scroll-target="#final-issf-coefficients"><span class="header-section-number">1</span> Final iSSF Coefficients</a></li>
+  <li><a href="#variable-selection-record" id="toc-variable-selection-record" class="nav-link" data-scroll-target="#variable-selection-record"><span class="header-section-number">2</span> Variable Selection Record</a></li>
+  <li><a href="#plugin-analysis-parameters" id="toc-plugin-analysis-parameters" class="nav-link" data-scroll-target="#plugin-analysis-parameters"><span class="header-section-number">3</span> Plugin Analysis Parameters</a></li>
+  <li><a href="#reproducing-the-statistical-output" id="toc-reproducing-the-statistical-output" class="nav-link" data-scroll-target="#reproducing-the-statistical-output"><span class="header-section-number">4</span> Reproducing the Statistical Output</a></li>
   </ul>
 </nav>
     </div>
@@ -258,12 +258,12 @@ window.Quarto = {
 
 
 <p>This appendix collects the full statistical output of the integrated step-selection function and the parameter settings of the five plugin analysis modules, so that the results in the main text can be reproduced and audited.</p>
-<section id="final-issf-coefficients" class="level2" data-number="B.1">
-<h2 data-number="B.1" class="anchored" data-anchor-id="final-issf-coefficients"><span class="header-section-number">B.1</span> Final iSSF Coefficients</h2>
+<section id="final-issf-coefficients" class="level2" data-number="1">
+<h2 data-number="1" class="anchored" data-anchor-id="final-issf-coefficients"><span class="header-section-number">1</span> Final iSSF Coefficients</h2>
 <p>The final conditional logistic regression was fitted on 7,824 in-matrix transit steps from 14 GPS-collared individuals in Canton Aargau, each compared against ten random control steps. All covariates are z-standardised with the Aargau training mean and standard deviation. The seven retained coefficients, ordered by magnitude, are summarised here for reference: distance to railway (<span class="math inline">\(\hat{\beta} = 0.558\)</span>), forest density at the 50-metre scale (<span class="math inline">\(\hat{\beta} = 0.501\)</span>), forest density gradient at the 1000-metre scale (<span class="math inline">\(\hat{\beta} = 0.260\)</span>), distance to main road (<span class="math inline">\(\hat{\beta} = 0.232\)</span>), distance to settlement (<span class="math inline">\(\hat{\beta} = 0.226\)</span>), distance to secondary road (<span class="math inline">\(\hat{\beta} = 0.169\)</span>), and distance to water (<span class="math inline">\(\hat{\beta} = 0.052\)</span>). All coefficients were positive and significant at the 0.05 level, and the variance inflation factors for the retained set ranged from 1.08 to 1.49.</p>
 </section>
-<section id="variable-selection-record" class="level2" data-number="B.2">
-<h2 data-number="B.2" class="anchored" data-anchor-id="variable-selection-record"><span class="header-section-number">B.2</span> Variable Selection Record</h2>
+<section id="variable-selection-record" class="level2" data-number="2">
+<h2 data-number="2" class="anchored" data-anchor-id="variable-selection-record"><span class="header-section-number">2</span> Variable Selection Record</h2>
 <table class="caption-top table">
 <caption>Variable selection decisions for the iSSF covariate set.</caption>
 <colgroup>
@@ -352,12 +352,12 @@ window.Quarto = {
 </tbody>
 </table>
 </section>
-<section id="plugin-analysis-parameters" class="level2" data-number="B.3">
-<h2 data-number="B.3" class="anchored" data-anchor-id="plugin-analysis-parameters"><span class="header-section-number">B.3</span> Plugin Analysis Parameters</h2>
+<section id="plugin-analysis-parameters" class="level2" data-number="3">
+<h2 data-number="3" class="anchored" data-anchor-id="plugin-analysis-parameters"><span class="header-section-number">3</span> Plugin Analysis Parameters</h2>
 <p>The five analytical modules of the <em>Wildboar Connectivity (ASF)</em> plugin share one analysis window and run on the following fixed default parameters. The window extends 11,500 metres in each direction from the outbreak origin, combining a 10,000-metre buffer with a 1,500-metre edge buffer. The infection-risk kernel rescales the published mean natal dispersal distance of European wild boar, 4 kilometres, into the cost-distance surface, mapping the EFSA protection zone (3 km) and surveillance zone (10 km) onto risk thresholds of 0.50 and 0.15. The biased correlated random walk releases 500 walkers by default, each taking up to 2,000 steps with a von Mises directional concentration of <span class="math inline">\(\kappa = 2.0\)</span>. The iSSF-based individual movement model runs 2,000 agents by default. Each agent draws its infectious period from a <span class="math inline">\(\text{Gamma}(\alpha = 3, \beta = 3.5\,\text{days})\)</span> distribution with a mean of 10.5 days, and at every move it evaluates 25 candidate endpoints generated from a gamma step-length kernel (shape 2.669, scale 160 m) and a von Mises turning-angle kernel (<span class="math inline">\(\kappa = 1.073\)</span>).</p>
 </section>
-<section id="reproducing-the-statistical-output" class="level2" data-number="B.4">
-<h2 data-number="B.4" class="anchored" data-anchor-id="reproducing-the-statistical-output"><span class="header-section-number">B.4</span> Reproducing the Statistical Output</h2>
+<section id="reproducing-the-statistical-output" class="level2" data-number="4">
+<h2 data-number="4" class="anchored" data-anchor-id="reproducing-the-statistical-output"><span class="header-section-number">4</span> Reproducing the Statistical Output</h2>
 <p>The iSSF coefficient table, the step classification counts, and all covariate summary statistics reported in the results chapter are produced directly from the processed data files by the R code chunks embedded in <code>5-ergebnisse.qmd</code>. Running the Quarto document against the processed data directory regenerates every table and figure deterministically.</p>
 
 

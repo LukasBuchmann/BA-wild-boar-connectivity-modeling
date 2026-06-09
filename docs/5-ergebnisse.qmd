@@ -273,11 +273,58 @@ base_groups <- c("Swisstopo (light)", "OpenStreetMap", "Satellite")
 ```
 
 ::: panel-tabset
+### Final Output Rasters
+
+```{r}
+#| label: map-outputs
+#| eval: !expr knitr::is_html_output()
+
+leaflet(options = leafletOptions(minZoom = 8)) |>
+  addProviderTiles("CartoDB.Positron",  group = "Swisstopo (light)") |>
+  addProviderTiles("OpenStreetMap",     group = "OpenStreetMap") |>
+  addProviderTiles("Esri.WorldImagery", group = "Satellite") |>
+  addRasterImage(lf_suit_ag, colors = pal_suit, opacity = 0.85,
+                 group = "Habitat Suitability — Aargau") |>
+  addRasterImage(lf_res_ag,  colors = pal_res,  opacity = 0.85,
+                 group = "Resistance — Aargau") |>
+  addRasterImage(lf_suit_zh, colors = pal_suit, opacity = 0.85,
+                 group = "Habitat Suitability — Zürich") |>
+  addRasterImage(lf_res_zh,  colors = pal_res,  opacity = 0.85,
+                 group = "Resistance — Zürich") |>
+  addLayersControl(
+    baseGroups    = base_groups,
+    overlayGroups = c("Habitat Suitability — Aargau",
+                      "Resistance — Aargau",
+                      "Habitat Suitability — Zürich",
+                      "Resistance — Zürich"),
+    options = layersControlOptions(collapsed = FALSE)
+  ) |>
+  setView(lng = 8.65, lat = 47.42, zoom = 9) |>
+  addLegend(pal = pal_suit, values = c(0, 1), title = "Suitability (S)",
+            position = "bottomright", group = "Habitat Suitability — Aargau") |>
+  addLegend(pal = pal_res, values = c(1, 55), title = "Resistance (R)",
+            position = "bottomright", group = "Resistance — Aargau") |>
+  addLegend(pal = pal_suit, values = c(0, 1), title = "Suitability (S)",
+            position = "bottomright", group = "Habitat Suitability — Zürich") |>
+  addLegend(pal = pal_res, values = c(1, 55), title = "Resistance (R)",
+            position = "bottomright", group = "Resistance — Zürich") |>
+  # Default view: only Resistance — Zürich (and its legend) shown. Hiding the
+  # other three AFTER the legends removes their legends via the groupremove event.
+  hideGroup(c("Habitat Suitability — Aargau",
+              "Resistance — Aargau",
+              "Habitat Suitability — Zürich"))
+```
+
 ### Forest Covariates
 
 ```{r}
 #| label: map-forest
 #| eval: !expr knitr::is_html_output()
+
+# Dedicated palette for distance-to-forest-edge (metres) so its own legend is
+# meaningful (this layer was previously drawn on the 0–1 forest-density scale).
+pal_dfe <- colorNumeric(hcl.colors(100, "Greens"),
+                        domain = range(lf_dfe[], na.rm = TRUE), na.color = "transparent")
 
 leaflet(options = leafletOptions(minZoom = 8)) |>
   addProviderTiles("CartoDB.Positron",   group = "Swisstopo (light)") |>
@@ -289,7 +336,7 @@ leaflet(options = leafletOptions(minZoom = 8)) |>
                  group = "Forest Density 50 m — Aargau") |>
   addRasterImage(lf_fdg, colors = pal_green, opacity = 0.8,
                  group = "Forest Density Gradient 1000 m — Aargau") |>
-  addRasterImage(lf_dfe, colors = pal_blues, opacity = 0.8,
+  addRasterImage(lf_dfe, colors = pal_dfe, opacity = 0.8,
                  group = "Dist Forest Edge — Aargau [excluded VIF]") |>
   addRasterImage(lf_fd_zh,  colors = pal_green, opacity = 0.8,
                  group = "Forest Density 50 m — Zürich") |>
@@ -305,14 +352,31 @@ leaflet(options = leafletOptions(minZoom = 8)) |>
                       "Forest Density Gradient 1000 m — Zürich"),
     options = layersControlOptions(collapsed = FALSE)
   ) |>
+  setView(lng = 8.15, lat = 47.38, zoom = 10) |>
+  # One legend per layer, each tied to its group via `group =` so it appears
+  # only when the corresponding layer is switched on in the layer control.
+  addLegend(colors = c("#f5f5e0", "#1a5c2e"), labels = c("Non-forest", "Forest"),
+            title = "Forest cover", position = "bottomright",
+            group = "Forest Cover (binary) — Aargau [excluded VIF]") |>
+  addLegend(pal = pal_green, values = c(0, 1), title = "Forest density 50 m (0–1)",
+            position = "bottomright", group = "Forest Density 50 m — Aargau") |>
+  addLegend(pal = pal_green, values = c(0, 1), title = "Forest density grad. 1000 m (0–1)",
+            position = "bottomright", group = "Forest Density Gradient 1000 m — Aargau") |>
+  addLegend(pal = pal_dfe, values = range(lf_dfe[], na.rm = TRUE), title = "Dist. forest edge (m)",
+            position = "bottomright", group = "Dist Forest Edge — Aargau [excluded VIF]") |>
+  addLegend(pal = pal_green, values = c(0, 1), title = "Forest density 50 m (0–1)",
+            position = "bottomright", group = "Forest Density 50 m — Zürich") |>
+  addLegend(pal = pal_green, values = c(0, 1), title = "Forest density grad. 1000 m (0–1)",
+            position = "bottomright", group = "Forest Density Gradient 1000 m — Zürich") |>
+  # Hide every layer by default (placed AFTER the legends so the groupremove
+  # event also removes each hidden layer's legend on load — nothing shown until
+  # the user toggles a layer on).
   hideGroup(c("Forest Cover (binary) — Aargau [excluded VIF]",
+              "Forest Density 50 m — Aargau",
               "Forest Density Gradient 1000 m — Aargau",
               "Dist Forest Edge — Aargau [excluded VIF]",
               "Forest Density 50 m — Zürich",
-              "Forest Density Gradient 1000 m — Zürich")) |>
-  setView(lng = 8.15, lat = 47.38, zoom = 10) |>
-  addLegend(pal = pal_green, values = c(0, 1),
-            title = "Forest density (0–1)", position = "bottomright")
+              "Forest Density Gradient 1000 m — Zürich"))
 ```
 
 ### Terrain Covariates
@@ -339,8 +403,12 @@ leaflet(options = leafletOptions(minZoom = 8)) |>
     options = layersControlOptions(collapsed = FALSE)
   ) |>
   setView(lng = 8.15, lat = 47.38, zoom = 10) |>
-  addLegend(pal = pal_sl, values = c(0, 70),
-            title = "Slope (°)", position = "bottomright")
+  addLegend(pal = pal_sl, values = c(0, 70), title = "Slope (°)",
+            position = "bottomright", group = "Slope (degrees) — excluded VIF") |>
+  addLegend(pal = pal_tri, values = c(0, 55), title = "Terrain Ruggedness Index",
+            position = "bottomright", group = "TRI — excluded VIF") |>
+  # Hide every layer (and its legend) by default.
+  hideGroup(c("Slope (degrees) — excluded VIF", "TRI — excluded VIF"))
 ```
 
 ### Water Covariates
@@ -372,12 +440,20 @@ leaflet(options = leafletOptions(minZoom = 8)) |>
                       "Dist Water — combined — Zürich [in iSSF]"),
     options = layersControlOptions(collapsed = FALSE)
   ) |>
-  hideGroup(c("Dist Flowing Water — Aargau [excluded]",
-              "Dist Lakes — Aargau [excluded]",
-              "Dist Water — combined — Zürich [in iSSF]")) |>
   setView(lng = 8.15, lat = 47.38, zoom = 10) |>
-  addLegend(pal = pal_dw, values = c(0, 3500),
-            title = "Distance (m)", position = "bottomright")
+  addLegend(pal = pal_dw, values = c(0, 3500), title = "Dist. water (m)",
+            position = "bottomright", group = "Dist Water — combined — Aargau [in iSSF]") |>
+  addLegend(pal = pal_dw, values = c(0, 3500), title = "Dist. flowing water (m)",
+            position = "bottomright", group = "Dist Flowing Water — Aargau [excluded]") |>
+  addLegend(pal = pal_dlk, values = c(0, 7200), title = "Dist. lakes (m)",
+            position = "bottomright", group = "Dist Lakes — Aargau [excluded]") |>
+  addLegend(pal = pal_dw, values = c(0, 3500), title = "Dist. water (m)",
+            position = "bottomright", group = "Dist Water — combined — Zürich [in iSSF]") |>
+  # Hide every layer (and its legend) by default.
+  hideGroup(c("Dist Water — combined — Aargau [in iSSF]",
+              "Dist Flowing Water — Aargau [excluded]",
+              "Dist Lakes — Aargau [excluded]",
+              "Dist Water — combined — Zürich [in iSSF]"))
 ```
 
 ### Infrastructure Covariates
@@ -427,15 +503,35 @@ leaflet(options = leafletOptions(minZoom = 8)) |>
                       "Dist Settlement — Zürich"),
     options = layersControlOptions(collapsed = FALSE)
   ) |>
-  hideGroup(c("Dist Secondary Road — Aargau",
+  setView(lng = 8.15, lat = 47.38, zoom = 10) |>
+  addLegend(pal = pal_mr, values = c(0, 7100), title = "Dist. main road (m)",
+            position = "bottomright", group = "Dist Main Road — Aargau") |>
+  addLegend(pal = pal_sr, values = c(0, 3250), title = "Dist. secondary road (m)",
+            position = "bottomright", group = "Dist Secondary Road — Aargau") |>
+  addLegend(pal = pal_rw, values = c(0, 7250), title = "Dist. railway (m)",
+            position = "bottomright", group = "Dist Railway — Aargau") |>
+  addLegend(pal = pal_se, values = c(0, 7000), title = "Dist. settlement (m)",
+            position = "bottomright", group = "Dist Settlement — Aargau") |>
+  addLegend(pal = pal_fr, values = c(0, 16710), title = "Dist. fenced road (m)",
+            position = "bottomright", group = "Dist Fenced Road — Aargau [excluded]") |>
+  addLegend(pal = pal_mr, values = c(0, 7100), title = "Dist. main road (m)",
+            position = "bottomright", group = "Dist Main Road — Zürich") |>
+  addLegend(pal = pal_sr, values = c(0, 3250), title = "Dist. secondary road (m)",
+            position = "bottomright", group = "Dist Secondary Road — Zürich") |>
+  addLegend(pal = pal_rw, values = c(0, 7250), title = "Dist. railway (m)",
+            position = "bottomright", group = "Dist Railway — Zürich") |>
+  addLegend(pal = pal_se, values = c(0, 7000), title = "Dist. settlement (m)",
+            position = "bottomright", group = "Dist Settlement — Zürich") |>
+  # Hide every layer (and its legend) by default.
+  hideGroup(c("Dist Main Road — Aargau",
+              "Dist Secondary Road — Aargau",
+              "Dist Railway — Aargau",
+              "Dist Settlement — Aargau",
               "Dist Fenced Road — Aargau [excluded]",
               "Dist Main Road — Zürich",
               "Dist Secondary Road — Zürich",
               "Dist Railway — Zürich",
-              "Dist Settlement — Zürich")) |>
-  setView(lng = 8.15, lat = 47.38, zoom = 10) |>
-  addLegend(pal = pal_mr, values = c(0, 7100),
-            title = "Distance (m)", position = "bottomright")
+              "Dist Settlement — Zürich"))
 ```
 
 ### Barrier and Passage Layers
@@ -475,52 +571,28 @@ leaflet(options = leafletOptions(minZoom = 8)) |>
                       "Wildlife passages — Zürich"),
     options = layersControlOptions(collapsed = FALSE)
   ) |>
-  hideGroup(c("Large lakes — Aargau",
+  setView(lng = 8.3, lat = 47.40, zoom = 9) |>
+  addLegend(colors = "#e74c3c", labels = "Highway barrier", title = "Barrier / passage",
+            position = "bottomright", opacity = 0.85, group = "Highway barriers — Aargau") |>
+  addLegend(colors = "#2980b9", labels = "Large lake", title = "Barrier / passage",
+            position = "bottomright", opacity = 0.85, group = "Large lakes — Aargau") |>
+  addLegend(colors = "#27ae60", labels = "Wildlife passage", title = "Barrier / passage",
+            position = "bottomright", opacity = 0.85, group = "Wildlife passages — Aargau") |>
+  addLegend(colors = "#e74c3c", labels = "Highway barrier", title = "Barrier / passage",
+            position = "bottomright", opacity = 0.85, group = "Highway barriers — Zürich") |>
+  addLegend(colors = "#2980b9", labels = "Large lake", title = "Barrier / passage",
+            position = "bottomright", opacity = 0.85, group = "Large lakes — Zürich") |>
+  addLegend(colors = "#27ae60", labels = "Wildlife passage", title = "Barrier / passage",
+            position = "bottomright", opacity = 0.85, group = "Wildlife passages — Zürich") |>
+  # Hide every layer (and its legend) by default.
+  hideGroup(c("Highway barriers — Aargau",
+              "Large lakes — Aargau",
+              "Wildlife passages — Aargau",
               "Highway barriers — Zürich",
               "Large lakes — Zürich",
-              "Wildlife passages — Zürich")) |>
-  setView(lng = 8.3, lat = 47.40, zoom = 9) |>
-  addLegend(colors = c("#e74c3c","#2980b9","#e67e22","#27ae60"),
-            labels = c("Highway", "Large lake", "Large settlement", "Wildlife passage"),
-            title = "Barrier / passage type", position = "bottomright",
-            opacity = 0.85)
+              "Wildlife passages — Zürich"))
 ```
 
-### Final Output Rasters
-
-```{r}
-#| label: map-outputs
-#| eval: !expr knitr::is_html_output()
-
-leaflet(options = leafletOptions(minZoom = 8)) |>
-  addProviderTiles("CartoDB.Positron",  group = "Swisstopo (light)") |>
-  addProviderTiles("OpenStreetMap",     group = "OpenStreetMap") |>
-  addProviderTiles("Esri.WorldImagery", group = "Satellite") |>
-  addRasterImage(lf_suit_ag, colors = pal_suit, opacity = 0.85,
-                 group = "Habitat Suitability — Aargau") |>
-  addRasterImage(lf_res_ag,  colors = pal_res,  opacity = 0.85,
-                 group = "Resistance — Aargau") |>
-  addRasterImage(lf_suit_zh, colors = pal_suit, opacity = 0.85,
-                 group = "Habitat Suitability — Zürich") |>
-  addRasterImage(lf_res_zh,  colors = pal_res,  opacity = 0.85,
-                 group = "Resistance — Zürich") |>
-  addLayersControl(
-    baseGroups    = base_groups,
-    overlayGroups = c("Habitat Suitability — Aargau",
-                      "Resistance — Aargau",
-                      "Habitat Suitability — Zürich",
-                      "Resistance — Zürich"),
-    options = layersControlOptions(collapsed = FALSE)
-  ) |>
-  hideGroup(c("Habitat Suitability — Aargau",
-              "Habitat Suitability — Zürich",
-              "Resistance — Zürich")) |>
-  setView(lng = 8.35, lat = 47.40, zoom = 9) |>
-  addLegend(pal = pal_res, values = c(1, 55),
-            title = "Resistance (R)", position = "bottomright") |>
-  addLegend(pal = pal_suit, values = c(0, 1),
-            title = "Suitability (S)", position = "bottomleft")
-```
 :::
 ::::
 
@@ -534,7 +606,7 @@ Of the fourteen spatial covariates assembled for the resistance surface pipeline
 # Copy into the project-local images/ folder so the typst compiler can read it
 # (typst refuses to load files outside its project root, i.e. outside docs/).
 local_png <- file.path("images", "suitability_resistance_maps_Aargau.png")
-file.copy(file.path(data_proc, "suitability_resistance_maps_Aargau.png"), local_png, overwrite = TRUE)
+invisible(file.copy(file.path(data_proc, "suitability_resistance_maps_Aargau.png"), local_png, overwrite = TRUE))
 knitr::include_graphics(local_png)
 ```
 
@@ -545,7 +617,7 @@ knitr::include_graphics(local_png)
 # Copy into the project-local images/ folder so the typst compiler can read it
 # (typst refuses to load files outside its project root, i.e. outside docs/).
 local_png <- file.path("images", "suitability_resistance_maps_Zurich.png")
-file.copy(file.path(data_proc, "suitability_resistance_maps_Zurich.png"), local_png, overwrite = TRUE)
+invisible(file.copy(file.path(data_proc, "suitability_resistance_maps_Zurich.png"), local_png, overwrite = TRUE))
 knitr::include_graphics(local_png)
 ```
 :::
@@ -566,7 +638,7 @@ The continuous infection-risk raster produced three discrete EFSA-aligned zones 
 
 The BCRW density and iSSF-IBMM contamination probability layers broadly corroborated the LCP and pinchpoint structure. The BCRW density surface showed the highest visitation counts along the same corridors identified by the Circuitscape analysis, confirming their role as preferred transit routes. The iSSF-IBMM log10-transformed contamination probability surface showed the steepest probability gradients at the forest-to-infrastructure transitions where resistance increases rapidly.
 
-![Baseline scenario produced by the Wildboar Connectivity (ASF) plugin for a single hypothetical outbreak origin (red point) in Canton Zürich, run without any fences or overpasses applied. Top left: Outbreak origin shown on the Swissimage basemap. Top right: Least-cost path corridors connecting the origin to the habitat destinations (green points), classed by cumulative edge strength into near-origin backbone, intermediate, and distant segments. Centre left: Infection-risk surface classified into the three EFSA-anchored zones (low, medium, high risk). Centre right: Circuit-theory dispersal corridor probability on a Magma colour ramp, concentrating current density into a small number of bright branches that mark the structurally most important crossings around the origin. Bottom left: Biased correlated random walk visitation density for n = 2,000 realisations, forming a compact, well-defined core directly around the origin that fades toward the edge of the analysis window. Bottom right: iSSF-IBMM contamination probability surface (log10-transformed) for n = 2,000 agents, showing a high-probability zone centred on the origin surrounded by a broader, lower-probability halo across the wider landscape.](images/baseline.png){#fig-plugin-baseline}
+![Baseline scenario produced by the Wildboar Connectivity (ASF) plugin for a single hypothetical outbreak origin (red point) in Canton Zürich, run without any fences or overpasses applied. Top left: Outbreak origin shown on the Swissimage basemap. Top right: Least-cost path corridors connecting the origin to the habitat destinations (green points), classed by cumulative edge strength into near-origin backbone, intermediate, and distant segments. Centre left: Infection-risk surface classified into the three EFSA-anchored zones (low, medium, high risk). Centre right: Circuit-theory dispersal corridor probability on a Magma colour ramp, concentrating current density into a small number of bright branches that mark the structurally most important crossings around the origin. Bottom left: Biased correlated random walk visitation density for n = 2,000 realisations, forming a compact, well-defined core directly around the origin that fades toward the edge of the analysis window. Bottom right: iSSF-IBMM contamination probability surface (log10-transformed) for n = 2,000 agents, showing a high-probability zone centred on the origin surrounded by a broader, lower-probability halo across the wider landscape.](images/baseline.png){#fig-plugin-baseline width=78%}
 
 ### Scenario Comparison: Virtual Fence Intervention
 
@@ -574,6 +646,6 @@ To demonstrate the scenario comparison functionality, multiple virtual fences we
 
 The pinchpoint raster showed a clear rerouting of current density away from the blocked corridor segments. The cumulative flow that previously concentrated at the motorway crossing was redistributed to the new overpass, building an alternative corridor. The LCP backbone similarly shifted away from the blocked crossing to the new generated one, increasing connectivity to the south. The area at risk of infection shrank asymmetrically on the side of the newly erected fences and expanded across the newly constructed wildlife overpass.
 
-![Comparison of the baseline scenario (left column) with a modified scenario in which four fences and one wildlife overpass were placed on impassable barriers and existing wildlife overpasses near the outbreak origin (shown as red lines and blue points). From top to bottom, the rows show the least-cost path corridors, the circuit-theory dispersal corridor probability, the infection-risk zones, the biased correlated random walk visitation density (n = 2,000), and the iSSF-IBMM contamination probability surface (n = 2,000 agents). Adding the fences visibly reshapes every downstream output along the affected edge: the corridor network and the medium-risk zone are truncated to the south and southwest, the circuit-theory current is rerouted into a narrower channel north of the origin and its peak probability rises from 0.00409 to 0.005633, and the random walk density is compressed into a smaller permeable area with its peak visitation count rising from 291 to 333. Because the same number of walkers and agents is now confined to less of the landscape, the comparison illustrates how a single barrier placement concentrates rather than simply blocks movement, and how the overpass alone is building a new corridor that crosses the highway.](images/with_fence.png){#fig-comparison}
+![Comparison of the baseline scenario (left column) with a modified scenario in which four fences and one wildlife overpass were placed on impassable barriers and existing wildlife overpasses near the outbreak origin (shown as red lines and blue points). From top to bottom, the rows show the least-cost path corridors, the circuit-theory dispersal corridor probability, the infection-risk zones, the biased correlated random walk visitation density (n = 2,000), and the iSSF-IBMM contamination probability surface (n = 2,000 agents). Adding the fences visibly reshapes every downstream output along the affected edge: the corridor network and the medium-risk zone are truncated to the south and southwest, the circuit-theory current is rerouted into a narrower channel north of the origin and its peak probability rises from 0.00409 to 0.005633, and the random walk density is compressed into a smaller permeable area with its peak visitation count rising from 291 to 333. Because the same number of walkers and agents is now confined to less of the landscape, the comparison illustrates how a single barrier placement concentrates rather than simply blocks movement, and how the overpass alone is building a new corridor that crosses the highway.](images/with_fence.png){#fig-comparison width=52%}
 
 The scenario comparison illustrates the core purpose of the plugin. It enables iterative exploration of management alternatives within the same GIS session. A wildlife manager can test different fence alignments, observe how each one redirects the modelled corridor network, and compare the resulting wild boar corridors and infection-risk zones, all without leaving the QGIS environment or re-running any preprocessing steps.

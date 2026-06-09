@@ -1,0 +1,29 @@
+[general]
+name=Wildboar Connectivity (ASF)
+qgisMinimumVersion=3.16
+description=Interactive ASF spread modelling: click an outbreak origin on a resistance raster, see where wild boar go, draw fences to break corridors.
+version=0.6
+author=Lukas Buchmann
+email=buchmluk@students.zhaw.ch
+
+about=Decision-support tool for hunting administrations preparing for African
+    Swine Fever (ASF). Load a Keeley-transformed iSSF resistance raster, click
+    one point as the outbreak origin, and the plugin computes: (a) an
+    infection-risk raster (resistant kernel, green/yellow/red), (b) least-cost
+    path corridors to the nearest low-resistance clusters, (c) a
+    Circuitscape/Circuit-theory pinchpoint raster, (d) an optional BCRW random-
+    walk density, and (e) an optional iSSF-IBMM agent contamination-probability
+    map. Fences and wildlife overpasses can be drawn interactively; hitting Run
+    again immediately shows the modified result.
+
+tracker=https://github.com/
+repository=https://github.com/
+
+hasProcessingProvider=no
+tags=connectivity, ASF, african swine fever, wild boar, wildlife, least cost path, circuitscape, pinchpoint, fence, overpass, iSSF, IBMM
+homepage=https://github.com/
+category=Plugins
+icon=icon.png
+experimental=True
+deprecated=False
+server=False

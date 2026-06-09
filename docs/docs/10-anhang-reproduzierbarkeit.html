@@ -213,10 +213,10 @@ ul.task-list li input[type="checkbox"] {
     <h2 id="toc-title">Table of contents</h2>
    
   <ul>
-  <li><a href="#code-and-workflow" id="toc-code-and-workflow" class="nav-link active" data-scroll-target="#code-and-workflow"><span class="header-section-number">D.1</span> Code and Workflow</a></li>
-  <li><a href="#software-environment" id="toc-software-environment" class="nav-link" data-scroll-target="#software-environment"><span class="header-section-number">D.2</span> Software Environment</a></li>
-  <li><a href="#directory-structure" id="toc-directory-structure" class="nav-link" data-scroll-target="#directory-structure"><span class="header-section-number">D.3</span> Directory Structure</a></li>
-  <li><a href="#data-availability" id="toc-data-availability" class="nav-link" data-scroll-target="#data-availability"><span class="header-section-number">D.4</span> Data Availability</a></li>
+  <li><a href="#code-and-workflow" id="toc-code-and-workflow" class="nav-link active" data-scroll-target="#code-and-workflow"><span class="header-section-number">1</span> Code and Workflow</a></li>
+  <li><a href="#software-environment" id="toc-software-environment" class="nav-link" data-scroll-target="#software-environment"><span class="header-section-number">2</span> Software Environment</a></li>
+  <li><a href="#directory-structure" id="toc-directory-structure" class="nav-link" data-scroll-target="#directory-structure"><span class="header-section-number">3</span> Directory Structure</a></li>
+  <li><a href="#data-availability" id="toc-data-availability" class="nav-link" data-scroll-target="#data-availability"><span class="header-section-number">4</span> Data Availability</a></li>
   </ul>
 </nav>
     </div>
@@ -228,21 +228,22 @@ ul.task-list li input[type="checkbox"] {
 
 
 <p>This thesis follows the FAIR principles for data and code management specified in the ZHAW Statement of Reproducibility.</p>
-<section id="code-and-workflow" class="level2" data-number="D.1">
-<h2 data-number="D.1" class="anchored" data-anchor-id="code-and-workflow"><span class="header-section-number">D.1</span> Code and Workflow</h2>
+<section id="code-and-workflow" class="level2" data-number="1">
+<h2 data-number="1" class="anchored" data-anchor-id="code-and-workflow"><span class="header-section-number">1</span> Code and Workflow</h2>
 <p>The analytical workflow is split across two components. The resistance surface pipeline, from raw telemetry to the final 25-metre resistance raster, is contained in the single Quarto notebook <code>scripts/01_create_resistance_surface.ipynb</code>. Given the same input data and software environment, this notebook produces identical outputs deterministically. All connectivity analyses, including the infection-risk kernel, the biased correlated random walk, and the iSSF-based individual movement model, are implemented directly in the QGIS plugin <em>Wildboar Connectivity (ASF)</em>. The plugin is distributed as a standard QGIS Python package with a <code>metadata.txt</code> manifest and can be installed through the QGIS plugin manager.</p>
 </section>
-<section id="software-environment" class="level2" data-number="D.2">
-<h2 data-number="D.2" class="anchored" data-anchor-id="software-environment"><span class="header-section-number">D.2</span> Software Environment</h2>
-<p>The ecological algorithm was developed in R 4.5.1 using <code>terra</code> 1.9.11, <code>sf</code> 1.1.0, <code>amt</code> 0.3.1.0, <code>survival</code> 3.8.3, <code>broom</code> 1.0.10, <code>car</code>, and the tidyverse packages <code>dplyr</code>, <code>tidyr</code>, <code>purrr</code>, and <code>lubridate</code>. The plugin was implemented for QGIS 3.40.13 in Python, with Circuitscape.jl invoked through a Julia subprocess and a scipy sparse fallback solver. [TO COMPLETE: insert the exact Python and Julia versions used.]</p>
+<section id="software-environment" class="level2" data-number="2">
+<h2 data-number="2" class="anchored" data-anchor-id="software-environment"><span class="header-section-number">2</span> Software Environment</h2>
+<p>The ecological algorithm was developed in R 4.5.1 using <code>terra</code> 1.9.11, <code>sf</code> 1.1.0, <code>amt</code> 0.3.1.0, <code>survival</code> 3.8.3, <code>broom</code> 1.0.10, <code>car</code>, and the tidyverse packages <code>dplyr</code>, <code>tidyr</code>, <code>purrr</code>, and <code>lubridate</code>. The plugin was implemented for QGIS 3.40.13 in Python, with Circuitscape.jl invoked through a Julia subprocess and a scipy sparse fallback solver.</p>
+<p>Here I have to insert the Python packages aswell.</p>
 </section>
-<section id="directory-structure" class="level2" data-number="D.3">
-<h2 data-number="D.3" class="anchored" data-anchor-id="directory-structure"><span class="header-section-number">D.3</span> Directory Structure</h2>
+<section id="directory-structure" class="level2" data-number="3">
+<h2 data-number="3" class="anchored" data-anchor-id="directory-structure"><span class="header-section-number">3</span> Directory Structure</h2>
 <p>The project follows a standard structure with separate directories for raw, temporary, and processed data (<code>data/raw</code>, <code>data/temp</code>, <code>data/processed</code>). Each transformation step is documented in the commented notebooks above.</p>
 </section>
-<section id="data-availability" class="level2" data-number="D.4">
-<h2 data-number="D.4" class="anchored" data-anchor-id="data-availability"><span class="header-section-number">D.4</span> Data Availability</h2>
-<p>All base geodata are drawn from publicly accessible Swiss federal services. The GPS telemetry and the permanent ASP fence shapefile were provided by the project partners and are not publicly redistributable. See <a href="7-anhang-rohdaten.html#tbl-datasets" class="quarto-xref">Table&nbsp;<span>A.1</span></a> in the data sources appendix for the full list of inputs and providers.</p>
+<section id="data-availability" class="level2" data-number="4">
+<h2 data-number="4" class="anchored" data-anchor-id="data-availability"><span class="header-section-number">4</span> Data Availability</h2>
+<p>All base geodata are drawn from publicly accessible Swiss federal services. The GPS telemetry and the permanent ASP fence shapefile were provided by the project partners and are not publicly redistributable. See <a href="7-anhang-rohdaten.html#tbl-datasets" class="quarto-xref">Table&nbsp;<span>1</span></a> in the data sources appendix for the full list of inputs and providers.</p>
 
 
 </section>

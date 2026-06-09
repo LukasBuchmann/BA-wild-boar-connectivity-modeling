@@ -4,17 +4,29 @@ This appendix documents the origin, version, and role of every dataset used to b
 
 ## Overview of Input Datasets
 
+```{=typst}
+// Render this dense 5-column table at a smaller size in the PDF so the columns
+// don't collide. The #[ ... ] content block scopes the size to this table only;
+// raw typst blocks are ignored in the HTML output.
+#[
+#set text(size: 9pt)
+```
+
 | Dataset | Provider | Version / edition | Native CRS | Role in the pipeline |
 |---------------|---------------|---------------|---------------|---------------|
 | Wild boar GPS telemetry | WILMA, ZHAW | 2014 to 2017, 16 individuals | LV03 (EPSG:21781) | Empirical calibration of the iSSF |
 | swissBOUNDARIES3D | swisstopo | 1.5 | LV95 (LN02) | Cantonal study area extents |
 | swissTLM3D | swisstopo | 2026 edition | LV95 | Forest, roads, railways, settlements, water |
-| DHM25 (`dhm25_grid_raster.asc`) | swisstopo | legacy, surveyed 1952 to 1999 | LV03 (EPSG:21781) | Slope and Terrain Ruggedness Index |
-| Wildlife passages (`Wildtierpassagen.gdb`) | FOEN | N2023 version | LV95 | Permeability override at crossing structures |
-| Permanent ASP fences (`Dauerzaeune.shp`) | WILMA, ZHAW | December 2024 | LV95 | Absolute barriers in the Zürich surface |
-| Wild boar core habitats (`Potenzial_Wildschwein_Kerneinstaende_ZH_2024_WILMA.shp`) | WILMA, ZHAW | December 2024 | LV95 | Spatial validation anchors and LCP targets |
+| DHM25 (`dhm25_​grid_​raster​.asc`) | swisstopo | legacy, surveyed 1952 to 1999 | LV03 (EPSG:21781) | Slope and Terrain Ruggedness Index |
+| Wildlife passages (`Wildtierpassagen​.gdb`) | FOEN | N2023 version | LV95 | Permeability override at crossing structures |
+| Permanent ASP fences (`Dauerzaeune​.shp`) | WILMA, ZHAW | December 2024 | LV95 | Absolute barriers in the Zürich surface |
+| Wild boar core habitats (`Potenzial_​Wildschwein_​Kerneinstaende_​ZH_​2024_​WILMA​.shp`) | WILMA, ZHAW | December 2024 | LV95 | Spatial validation anchors and LCP targets |
 
-: Overview of input datasets, their providers, versions, native coordinate systems, and roles in the modelling pipeline. {#tbl-datasets}
+: Overview of input datasets, their providers, versions, native coordinate systems, and roles in the modelling pipeline. {#tbl-datasets tbl-colwidths="[26,11,22,16,25]"}
+
+```{=typst}
+]
+```
 
 ## Data Availability
 

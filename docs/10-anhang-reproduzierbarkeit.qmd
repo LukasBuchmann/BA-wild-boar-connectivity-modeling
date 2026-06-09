@@ -8,7 +8,9 @@ The analytical workflow is split across two components. The resistance surface p
 
 ## Software Environment
 
-The ecological algorithm was developed in R 4.5.1 using `terra` 1.9.11, `sf` 1.1.0, `amt` 0.3.1.0, `survival` 3.8.3, `broom` 1.0.10, `car`, and the tidyverse packages `dplyr`, `tidyr`, `purrr`, and `lubridate`. The plugin was implemented for QGIS 3.40.13 in Python, with Circuitscape.jl invoked through a Julia subprocess and a scipy sparse fallback solver. [TO COMPLETE: insert the exact Python and Julia versions used.]
+The ecological algorithm was developed in R 4.5.1 using `terra` 1.9.11, `sf` 1.1.0, `amt` 0.3.1.0, `survival` 3.8.3, `broom` 1.0.10, `car`, and the tidyverse packages `dplyr`, `tidyr`, `purrr`, and `lubridate`. The plugin was implemented for QGIS 3.40.13 in Python, with Circuitscape.jl invoked through a Julia subprocess and a scipy sparse fallback solver. 
+
+Here I have to insert the Python packages aswell.
 
 ## Directory Structure
 

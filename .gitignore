@@ -242,6 +242,3 @@ data/
 *.rar
 /.quarto/
 **/*.quarto_ipynb
-
-# Rendered Quarto PDF exceeds GitHub 100MB limit (embeds large map PNGs)
-docs/docs/*.pdf

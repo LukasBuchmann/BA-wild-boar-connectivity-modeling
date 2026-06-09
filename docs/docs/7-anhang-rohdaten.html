@@ -214,8 +214,8 @@ ul.task-list li input[type="checkbox"] {
     <h2 id="toc-title">Table of contents</h2>
    
   <ul>
-  <li><a href="#overview-of-input-datasets" id="toc-overview-of-input-datasets" class="nav-link active" data-scroll-target="#overview-of-input-datasets"><span class="header-section-number">A.1</span> Overview of Input Datasets</a></li>
-  <li><a href="#data-availability" id="toc-data-availability" class="nav-link" data-scroll-target="#data-availability"><span class="header-section-number">A.2</span> Data Availability</a></li>
+  <li><a href="#overview-of-input-datasets" id="toc-overview-of-input-datasets" class="nav-link active" data-scroll-target="#overview-of-input-datasets"><span class="header-section-number">1</span> Overview of Input Datasets</a></li>
+  <li><a href="#data-availability" id="toc-data-availability" class="nav-link" data-scroll-target="#data-availability"><span class="header-section-number">2</span> Data Availability</a></li>
   </ul>
 </nav>
     </div>
@@ -227,21 +227,21 @@ ul.task-list li input[type="checkbox"] {
 
 
 <p>This appendix documents the origin, version, and role of every dataset used to build the resistance surface and to develop the QGIS plugin. All spatial layers were standardised to the Swiss coordinate reference system LV95 (EPSG:2056) before processing.</p>
-<section id="overview-of-input-datasets" class="level2" data-number="A.1">
-<h2 data-number="A.1" class="anchored" data-anchor-id="overview-of-input-datasets"><span class="header-section-number">A.1</span> Overview of Input Datasets</h2>
-<div id="tbl-datasets" class="quarto-float quarto-figure quarto-figure-center anchored">
+<section id="overview-of-input-datasets" class="level2" data-number="1">
+<h2 data-number="1" class="anchored" data-anchor-id="overview-of-input-datasets"><span class="header-section-number">1</span> Overview of Input Datasets</h2>
+<div id="tbl-datasets" class="quarto-float quarto-figure quarto-figure-center anchored" data-tbl-colwidths="[26,11,22,16,25]">
 <figure class="quarto-float quarto-float-tbl figure">
 <figcaption class="quarto-float-caption-top quarto-float-caption quarto-float-tbl" id="tbl-datasets-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-Table&nbsp;A.1: Overview of input datasets, their providers, versions, native coordinate systems, and roles in the modelling pipeline.
+Table&nbsp;1: Overview of input datasets, their providers, versions, native coordinate systems, and roles in the modelling pipeline.
 </figcaption>
 <div aria-describedby="tbl-datasets-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
 <table class="caption-top table">
 <colgroup>
-<col style="width: 20%">
-<col style="width: 20%">
-<col style="width: 20%">
-<col style="width: 20%">
-<col style="width: 20%">
+<col style="width: 26%">
+<col style="width: 11%">
+<col style="width: 22%">
+<col style="width: 16%">
+<col style="width: 25%">
 </colgroup>
 <thead>
 <tr class="header">
@@ -275,28 +275,28 @@ Table&nbsp;A.1: Overview of input datasets, their providers, versions, native co
 <td>Forest, roads, railways, settlements, water</td>
 </tr>
 <tr class="even">
-<td>DHM25 (<code>dhm25_grid_raster.asc</code>)</td>
+<td>DHM25 (<code>dhm25_​grid_​raster​.asc</code>)</td>
 <td>swisstopo</td>
 <td>legacy, surveyed 1952 to 1999</td>
 <td>LV03 (EPSG:21781)</td>
 <td>Slope and Terrain Ruggedness Index</td>
 </tr>
 <tr class="odd">
-<td>Wildlife passages (<code>Wildtierpassagen.gdb</code>)</td>
+<td>Wildlife passages (<code>Wildtierpassagen​.gdb</code>)</td>
 <td>FOEN</td>
 <td>N2023 version</td>
 <td>LV95</td>
 <td>Permeability override at crossing structures</td>
 </tr>
 <tr class="even">
-<td>Permanent ASP fences (<code>Dauerzaeune.shp</code>)</td>
+<td>Permanent ASP fences (<code>Dauerzaeune​.shp</code>)</td>
 <td>WILMA, ZHAW</td>
 <td>December 2024</td>
 <td>LV95</td>
 <td>Absolute barriers in the Zürich surface</td>
 </tr>
 <tr class="odd">
-<td>Wild boar core habitats (<code>Potenzial_Wildschwein_Kerneinstaende_ZH_2024_WILMA.shp</code>)</td>
+<td>Wild boar core habitats (<code>Potenzial_​Wildschwein_​Kerneinstaende_​ZH_​2024_​WILMA​.shp</code>)</td>
 <td>WILMA, ZHAW</td>
 <td>December 2024</td>
 <td>LV95</td>
@@ -308,9 +308,9 @@ Table&nbsp;A.1: Overview of input datasets, their providers, versions, native co
 </figure>
 </div>
 </section>
-<section id="data-availability" class="level2" data-number="A.2">
-<h2 data-number="A.2" class="anchored" data-anchor-id="data-availability"><span class="header-section-number">A.2</span> Data Availability</h2>
-<p>All base geodata are drawn from publicly accessible Swiss federal services (swisstopo, FOEN). The GPS telemetry and the permanent ASP fence shapefile were provided by the project partners (WILMA, ZHAW) and are not publicly redistributable. The processing scripts that transform these inputs into the final resistance rasters are documented in <a href="10-anhang-reproduzierbarkeit.html" class="quarto-xref"><span>Appendix D</span></a>.</p>
+<section id="data-availability" class="level2" data-number="2">
+<h2 data-number="2" class="anchored" data-anchor-id="data-availability"><span class="header-section-number">2</span> Data Availability</h2>
+<p>All base geodata are drawn from publicly accessible Swiss federal services (swisstopo, FOEN). The GPS telemetry and the permanent ASP fence shapefile were provided by the project partners (WILMA, ZHAW) and are not publicly redistributable. The processing scripts that transform these inputs into the final resistance rasters are documented in <a href="10-anhang-reproduzierbarkeit.html" class="quarto-xref"><span>Section D</span></a>.</p>
 
 
 </section>

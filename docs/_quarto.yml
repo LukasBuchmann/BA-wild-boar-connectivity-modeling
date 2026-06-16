@@ -54,9 +54,11 @@ supervisors:
   - title:
     name: "Ratnaweera Nils"
     affiliation: "ZHAW Life Sciences und Facility Management, Wädenswil"
+    research group: Geoinformatik
   - title:
     name: "Sigrist Benjamin"
     affiliation: "ZHAW Life Sciences und Facility Management, Wädenswil"
+    research group: Wildtiermanagement (WILMA)
 
 format:
   zhaw-lsfm-html: default

@@ -102,7 +102,7 @@ The three-rule hierarchical classifier partitioned these steps into 7,824 (5.9%)
 #| tbl-cap: "Step classification counts for the in-matrix telemetry dataset. Rules are applied hierarchically in the order shown. A step is classified as in-matrix if it meets any rule that has not been met by a prior rule."
 
 rule_df <- data.frame(
-  Rule = c("Rule 1", "Rule 2", "Rule 3", "**Total in-matrix**", "*In-patch*"),
+  Rule = c("Rule 1", "Rule 2", "Rule 3", "**In-matrix**", "*In-patch*"),
   Criterion = c(
     "Step length > 250 m",
     "Step length > 150 m AND turning angle < π/4",
@@ -116,10 +116,7 @@ rule_df <- data.frame(
 )
 
 # Plain pandoc-native markdown table: converts cleanly to both HTML and typst
-# output without depending on kableExtra's format detection (which does not
-# recognise the custom zhaw-lsfm-typst format and falls back to producing an
-# HTML table, which is what triggered the "Functions that produce HTML output
-# found in document targeting typst output" error).
+# output without depending on kableExtra's format detection
 knitr::kable(rule_df, align = c("l", "l", "r", "r"), format = "pipe")
 ```
 
@@ -592,7 +589,6 @@ leaflet(options = leafletOptions(minZoom = 8)) |>
               "Large lakes — Zürich",
               "Wildlife passages — Zürich"))
 ```
-
 :::
 ::::
 
@@ -638,7 +634,7 @@ The continuous infection-risk raster produced three discrete EFSA-aligned zones 
 
 The BCRW density and iSSF-IBMM contamination probability layers broadly corroborated the LCP and pinchpoint structure. The BCRW density surface showed the highest visitation counts along the same corridors identified by the Circuitscape analysis, confirming their role as preferred transit routes. The iSSF-IBMM log10-transformed contamination probability surface showed the steepest probability gradients at the forest-to-infrastructure transitions where resistance increases rapidly.
 
-![Baseline scenario produced by the Wildboar Connectivity (ASF) plugin for a single hypothetical outbreak origin (red point) in Canton Zürich, run without any fences or overpasses applied. Top left: Outbreak origin shown on the Swissimage basemap. Top right: Least-cost path corridors connecting the origin to the habitat destinations (green points), classed by cumulative edge strength into near-origin backbone, intermediate, and distant segments. Centre left: Infection-risk surface classified into the three EFSA-anchored zones (low, medium, high risk). Centre right: Circuit-theory dispersal corridor probability on a Magma colour ramp, concentrating current density into a small number of bright branches that mark the structurally most important crossings around the origin. Bottom left: Biased correlated random walk visitation density for n = 2,000 realisations, forming a compact, well-defined core directly around the origin that fades toward the edge of the analysis window. Bottom right: iSSF-IBMM contamination probability surface (log10-transformed) for n = 2,000 agents, showing a high-probability zone centred on the origin surrounded by a broader, lower-probability halo across the wider landscape.](images/baseline.png){#fig-plugin-baseline width=78%}
+![Baseline scenario produced by the Wildboar Connectivity (ASF) plugin for a single hypothetical outbreak origin (red point) in Canton Zürich, run without any fences or overpasses applied. Top left: Outbreak origin shown on the Swissimage basemap. Top right: Least-cost path corridors connecting the origin to the habitat destinations (green points), classed by cumulative edge strength into near-origin backbone, intermediate, and distant segments. Centre left: Infection-risk surface classified into the three EFSA-anchored zones (low, medium, high risk). Centre right: Circuit-theory dispersal corridor probability on a Magma colour ramp, concentrating current density into a small number of bright branches that mark the structurally most important crossings around the origin. Bottom left: Biased correlated random walk visitation density for n = 2,000 realisations, forming a compact, well-defined core directly around the origin that fades toward the edge of the analysis window. Bottom right: iSSF-IBMM contamination probability surface (log10-transformed) for n = 2,000 agents, showing a high-probability zone centred on the origin surrounded by a broader, lower-probability halo across the wider landscape.](images/baseline.png){#fig-plugin-baseline width="78%"}
 
 ### Scenario Comparison: Virtual Fence Intervention
 
@@ -646,6 +642,6 @@ To demonstrate the scenario comparison functionality, multiple virtual fences we
 
 The pinchpoint raster showed a clear rerouting of current density away from the blocked corridor segments. The cumulative flow that previously concentrated at the motorway crossing was redistributed to the new overpass, building an alternative corridor. The LCP backbone similarly shifted away from the blocked crossing to the new generated one, increasing connectivity to the south. The area at risk of infection shrank asymmetrically on the side of the newly erected fences and expanded across the newly constructed wildlife overpass.
 
-![Comparison of the baseline scenario (left column) with a modified scenario in which four fences and one wildlife overpass were placed on impassable barriers and existing wildlife overpasses near the outbreak origin (shown as red lines and blue points). From top to bottom, the rows show the least-cost path corridors, the circuit-theory dispersal corridor probability, the infection-risk zones, the biased correlated random walk visitation density (n = 2,000), and the iSSF-IBMM contamination probability surface (n = 2,000 agents). Adding the fences visibly reshapes every downstream output along the affected edge: the corridor network and the medium-risk zone are truncated to the south and southwest, the circuit-theory current is rerouted into a narrower channel north of the origin and its peak probability rises from 0.00409 to 0.005633, and the random walk density is compressed into a smaller permeable area with its peak visitation count rising from 291 to 333. Because the same number of walkers and agents is now confined to less of the landscape, the comparison illustrates how a single barrier placement concentrates rather than simply blocks movement, and how the overpass alone is building a new corridor that crosses the highway.](images/with_fence.png){#fig-comparison width=52%}
+![Comparison of the baseline scenario (left column) with a modified scenario in which four fences and one wildlife overpass were placed on impassable barriers and existing wildlife overpasses near the outbreak origin (shown as red lines and blue points). From top to bottom, the rows show the least-cost path corridors, the circuit-theory dispersal corridor probability, the infection-risk zones, the biased correlated random walk visitation density (n = 2,000), and the iSSF-IBMM contamination probability surface (n = 2,000 agents). Adding the fences visibly reshapes every downstream output along the affected edge: the corridor network and the medium-risk zone are truncated to the south and southwest, the circuit-theory current is rerouted into a narrower channel north of the origin and its peak probability rises from 0.00409 to 0.005633, and the random walk density is compressed into a smaller permeable area with its peak visitation count rising from 291 to 333. Because the same number of walkers and agents is now confined to less of the landscape, the comparison illustrates how a single barrier placement concentrates rather than simply blocks movement, and how the overpass alone is building a new corridor that crosses the highway.](images/with_fence.png){#fig-comparison width="52%"}
 
 The scenario comparison illustrates the core purpose of the plugin. It enables iterative exploration of management alternatives within the same GIS session. A wildlife manager can test different fence alignments, observe how each one redirects the modelled corridor network, and compare the resulting wild boar corridors and infection-risk zones, all without leaving the QGIS environment or re-running any preprocessing steps.

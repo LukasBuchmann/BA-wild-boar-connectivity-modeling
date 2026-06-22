@@ -1,0 +1,884 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
+
+<meta charset="utf-8">
+<meta name="generator" content="quarto-1.9.31">
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+
+<meta name="keywords" content="wild boar, Sus scrofa, African swine fever, landscape connectivity, resistance surface, circuit theory, step-selection function, QGIS plugin, Canton Zürich">
+
+<title>2&nbsp; Theoretical Background – An Interactive Planning Tool for Wild Boar Connectivity and African Swine Fever Prevention</title>
+<style>
+/* Default styles provided by pandoc.
+** See https://pandoc.org/MANUAL.html#variables-for-html for config info.
+*/
+code{white-space: pre-wrap;}
+span.smallcaps{font-variant: small-caps;}
+div.columns{display: flex; gap: min(4vw, 1.5em);}
+div.column{flex: auto; overflow-x: auto;}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+ul.task-list{list-style: none;}
+ul.task-list li input[type="checkbox"] {
+  width: 0.8em;
+  margin: 0 0.8em 0.2em -1em; /* quarto-specific, see https://github.com/quarto-dev/quarto-cli/issues/4556 */ 
+  vertical-align: middle;
+}
+/* CSS for citations */
+div.csl-bib-body { }
+div.csl-entry {
+  clear: both;
+}
+.hanging-indent div.csl-entry {
+  margin-left:2em;
+  text-indent:-2em;
+}
+div.csl-left-margin {
+  min-width:2em;
+  float:left;
+}
+div.csl-right-inline {
+  margin-left:2em;
+  padding-left:1em;
+}
+div.csl-indent {
+  margin-left: 2em;
+}</style>
+
+
+<script src="site_libs/quarto-nav/quarto-nav.js"></script>
+<script src="site_libs/quarto-nav/headroom.min.js"></script>
+<script src="site_libs/clipboard/clipboard.min.js"></script>
+<script src="site_libs/quarto-search/autocomplete.umd.js"></script>
+<script src="site_libs/quarto-search/fuse.min.js"></script>
+<script src="site_libs/quarto-search/quarto-search.js"></script>
+<meta name="quarto:offset" content="./">
+<link href="./4-methoden.html" rel="next">
+<link href="./2-einleitung.html" rel="prev">
+<script src="site_libs/quarto-html/quarto.js" type="module"></script>
+<script src="site_libs/quarto-html/tabsets/tabsets.js" type="module"></script>
+<script src="site_libs/quarto-html/popper.min.js"></script>
+<script src="site_libs/quarto-html/tippy.umd.min.js"></script>
+<script src="site_libs/quarto-html/anchor.min.js"></script>
+<link href="site_libs/quarto-html/tippy.css" rel="stylesheet">
+<link href="site_libs/quarto-html/quarto-syntax-highlighting-7c69b197886ae2a34062761d21e44731.css" rel="stylesheet" id="quarto-text-highlighting-styles">
+<script src="site_libs/bootstrap/bootstrap.min.js"></script>
+<link href="site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
+<link href="site_libs/bootstrap/bootstrap-12eeb4b20e9f5a2b0bfc604bfaf942bb.min.css" rel="stylesheet" append-hash="true" id="quarto-bootstrap" data-mode="light">
+<script id="quarto-search-options" type="application/json">{
+  "location": "sidebar",
+  "copy-button": false,
+  "collapse-after": 3,
+  "panel-placement": "start",
+  "type": "textbox",
+  "limit": 50,
+  "keyboard-shortcut": [
+    "f",
+    "/",
+    "s"
+  ],
+  "show-item-context": false,
+  "language": {
+    "search-no-results-text": "No results",
+    "search-matching-documents-text": "matching documents",
+    "search-copy-link-title": "Copy link to search",
+    "search-hide-matches-text": "Hide additional matches",
+    "search-more-match-text": "more match in this document",
+    "search-more-matches-text": "more matches in this document",
+    "search-clear-button-title": "Clear",
+    "search-text-placeholder": "",
+    "search-detached-cancel-button-title": "Cancel",
+    "search-submit-button-title": "Submit",
+    "search-label": "Search"
+  }
+}</script>
+
+  <script src="https://cdnjs.cloudflare.com/polyfill/v3/polyfill.min.js?features=es6"></script>
+  <script defer="" src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml-full.js" type="text/javascript"></script>
+
+<script type="text/javascript">
+const typesetMath = (el) => {
+  if (window.MathJax) {
+    // MathJax Typeset
+    window.MathJax.typeset([el]);
+  } else if (window.katex) {
+    // KaTeX Render
+    var mathElements = el.getElementsByClassName("math");
+    var macros = [];
+    for (var i = 0; i < mathElements.length; i++) {
+      var texText = mathElements[i].firstChild;
+      if (mathElements[i].tagName == "SPAN" && texText && texText.data) {
+        window.katex.render(texText.data, mathElements[i], {
+          displayMode: mathElements[i].classList.contains('display'),
+          throwOnError: false,
+          macros: macros,
+          fleqn: false
+        });
+      }
+    }
+  }
+}
+window.Quarto = {
+  typesetMath
+};
+</script>
+
+<link rel="stylesheet" href="site_libs\quarto-contrib\quarto-project\zhaw-lsfm\zhaw-lsfm\zhaw-html.css">
+</head>
+
+<body class="nav-sidebar floating quarto-light">
+
+<div id="quarto-search-results"></div>
+  <header id="quarto-header" class="headroom fixed-top">
+  <nav class="quarto-secondary-nav">
+    <div class="container-fluid d-flex">
+      <button type="button" class="quarto-btn-toggle btn" data-bs-toggle="collapse" role="button" data-bs-target=".quarto-sidebar-collapse-item" aria-controls="quarto-sidebar" aria-expanded="false" aria-label="Toggle sidebar navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">
+        <i class="bi bi-layout-text-sidebar-reverse"></i>
+      </button>
+        <nav class="quarto-page-breadcrumbs" aria-label="breadcrumb"><ol class="breadcrumb"><li class="breadcrumb-item"><a href="./3-literatur.html"><span class="chapter-number">2</span>&nbsp; <span class="chapter-title">Theoretical Background</span></a></li></ol></nav>
+        <a class="flex-grow-1" role="navigation" data-bs-toggle="collapse" data-bs-target=".quarto-sidebar-collapse-item" aria-controls="quarto-sidebar" aria-expanded="false" aria-label="Toggle sidebar navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">      
+        </a>
+      <button type="button" class="btn quarto-search-button" aria-label="Search" onclick="window.quartoOpenSearch();">
+        <i class="bi bi-search"></i>
+      </button>
+    </div>
+  </nav>
+</header>
+<!-- content -->
+<div id="quarto-content" class="quarto-container page-columns page-rows-contents page-layout-article">
+<!-- sidebar -->
+  <nav id="quarto-sidebar" class="sidebar collapse collapse-horizontal quarto-sidebar-collapse-item sidebar-navigation floating overflow-auto">
+    <div class="pt-lg-2 mt-2 text-left sidebar-header">
+    <div class="sidebar-title mb-0 py-0">
+      <a href="./">An Interactive Planning Tool for Wild Boar Connectivity and African Swine Fever Prevention</a> 
+        <div class="sidebar-tools-main">
+    <a href="./An-Interactive-Planning-Tool-for-Wild-Boar-Connectivity-and-African-Swine-Fever-Prevention.pdf" title="Download PDF" class="quarto-navigation-tool px-1" aria-label="Download PDF"><i class="bi bi-file-pdf"></i></a>
+</div>
+    </div>
+      </div>
+        <div class="mt-2 flex-shrink-0 align-items-center">
+        <div class="sidebar-search">
+        <div id="quarto-search" class="" title="Search"></div>
+        </div>
+        </div>
+    <div class="sidebar-menu-container"> 
+    <ul class="list-unstyled mt-1">
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./index.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Front Page</span></a>
+  </div>
+</li>
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./1-zusammenfassung.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Abstract</span></a>
+  </div>
+</li>
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./1b-abkuerzungen.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">List of Abbreviations</span></a>
+  </div>
+</li>
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./2-einleitung.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text"><span class="chapter-number">1</span>&nbsp; <span class="chapter-title">Introduction</span></span></a>
+  </div>
+</li>
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./3-literatur.html" class="sidebar-item-text sidebar-link active">
+ <span class="menu-text"><span class="chapter-number">2</span>&nbsp; <span class="chapter-title">Theoretical Background</span></span></a>
+  </div>
+</li>
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./4-methoden.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text"><span class="chapter-number">3</span>&nbsp; <span class="chapter-title">Material and Methods</span></span></a>
+  </div>
+</li>
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./5-ergebnisse.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text"><span class="chapter-number">4</span>&nbsp; <span class="chapter-title">Results</span></span></a>
+  </div>
+</li>
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./6-diskussion.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text"><span class="chapter-number">5</span>&nbsp; <span class="chapter-title">Discussion</span></span></a>
+  </div>
+</li>
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./references.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Bibliography</span></a>
+  </div>
+</li>
+        <li class="sidebar-item sidebar-item-section">
+      <div class="sidebar-item-container"> 
+            <a class="sidebar-item-text sidebar-link text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-1" role="navigation" aria-expanded="true">
+ <span class="menu-text">Appendices</span></a>
+          <a class="sidebar-item-toggle text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-1" role="navigation" aria-expanded="true" aria-label="Toggle section">
+            <i class="bi bi-chevron-right ms-2"></i>
+          </a> 
+      </div>
+      <ul id="quarto-sidebar-section-1" class="collapse list-unstyled sidebar-section depth1 show">  
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./7-anhang-rohdaten.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text"><span class="chapter-number">A</span>&nbsp; <span class="chapter-title">Data Sources and Input Datasets</span></span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./8-anhang-statistik.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text"><span class="chapter-number">B</span>&nbsp; <span class="chapter-title">Statistical Outputs and Model Parameters</span></span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./9-anhang-ki.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text"><span class="chapter-number">C</span>&nbsp; <span class="chapter-title">Declaration of Generative AI Use</span></span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./10-anhang-reproduzierbarkeit.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text"><span class="chapter-number">D</span>&nbsp; <span class="chapter-title">Statement of Reproducibility</span></span></a>
+  </div>
+</li>
+      </ul>
+  </li>
+    </ul>
+    </div>
+</nav>
+<div id="quarto-sidebar-glass" class="quarto-sidebar-collapse-item" data-bs-toggle="collapse" data-bs-target=".quarto-sidebar-collapse-item"></div>
+<!-- margin-sidebar -->
+    <div id="quarto-margin-sidebar" class="sidebar margin-sidebar">
+        <nav id="TOC" role="doc-toc" class="toc-active">
+    <h2 id="toc-title">Table of contents</h2>
+   
+  <ul>
+  <li><a href="#ecological-connectivity-in-fragmented-landscapes" id="toc-ecological-connectivity-in-fragmented-landscapes" class="nav-link active" data-scroll-target="#ecological-connectivity-in-fragmented-landscapes"><span class="header-section-number">1</span> Ecological Connectivity in Fragmented Landscapes</a></li>
+  <li><a href="#modeling-functional-connectivity" id="toc-modeling-functional-connectivity" class="nav-link" data-scroll-target="#modeling-functional-connectivity"><span class="header-section-number">2</span> Modeling Functional Connectivity</a>
+  <ul class="collapse">
+  <li><a href="#resistance-surfaces-and-the-integrated-step-selection-function" id="toc-resistance-surfaces-and-the-integrated-step-selection-function" class="nav-link" data-scroll-target="#resistance-surfaces-and-the-integrated-step-selection-function"><span class="header-section-number">2.1</span> Resistance Surfaces and the Integrated Step-Selection Function</a></li>
+  <li><a href="#least-cost-paths-and-circuit-theory" id="toc-least-cost-paths-and-circuit-theory" class="nav-link" data-scroll-target="#least-cost-paths-and-circuit-theory"><span class="header-section-number">2.2</span> Least-Cost Paths and Circuit Theory</a></li>
+  <li><a href="#infection-risk-kernels-and-cost-distance-dispersal" id="toc-infection-risk-kernels-and-cost-distance-dispersal" class="nav-link" data-scroll-target="#infection-risk-kernels-and-cost-distance-dispersal"><span class="header-section-number">2.3</span> Infection-Risk Kernels and Cost-Distance Dispersal</a></li>
+  <li><a href="#biased-correlated-random-walk" id="toc-biased-correlated-random-walk" class="nav-link" data-scroll-target="#biased-correlated-random-walk"><span class="header-section-number">2.4</span> Biased Correlated Random Walk</a></li>
+  <li><a href="#individual-based-movement-models" id="toc-individual-based-movement-models" class="nav-link" data-scroll-target="#individual-based-movement-models"><span class="header-section-number">2.5</span> Individual-Based Movement Models</a></li>
+  </ul></li>
+  <li><a href="#wild-boar-ecology" id="toc-wild-boar-ecology" class="nav-link" data-scroll-target="#wild-boar-ecology"><span class="header-section-number">3</span> Wild Boar Ecology</a></li>
+  <li><a href="#african-swine-fever-and-the-connectivity-trade-off" id="toc-african-swine-fever-and-the-connectivity-trade-off" class="nav-link" data-scroll-target="#african-swine-fever-and-the-connectivity-trade-off"><span class="header-section-number">4</span> African Swine Fever and the Connectivity Trade-off</a></li>
+  </ul>
+</nav>
+    </div>
+<!-- main -->
+<main class="content" id="quarto-document-content"><header id="title-block-header" class="quarto-title-block"></header>
+
+<h1 class="title"><span class="chapter-number">2</span>&nbsp; <span class="chapter-title">Theoretical Background</span></h1>
+
+
+
+<p>This chapter sets out the concepts the thesis relies on: landscape connectivity and its modeling, the movement ecology of wild boar, and the epidemiology of African Swine Fever (ASF), which together make connectivity a key factor in disease management.</p>
+<section id="ecological-connectivity-in-fragmented-landscapes" class="level2" data-number="1">
+<h2 data-number="1" class="anchored" data-anchor-id="ecological-connectivity-in-fragmented-landscapes"><span class="header-section-number">1</span> Ecological Connectivity in Fragmented Landscapes</h2>
+<p>Landscape connectivity describes the degree to which a landscape facilitates or impedes the movement of organisms among habitat patches. <span class="citation" data-cites="taylor1993">Taylor et al. (<a href="#ref-taylor1993" role="doc-biblioref">1993</a>)</span> formalised the concept as a vital structural element of landscapes, and it is now standard to separate two dimensions. Structural connectivity refers to the physical arrangement of habitat in space and can be read from land cover maps alone. Functional connectivity reflects the behavioural response of a specific species to that structure <span class="citation" data-cites="urbina2023 tischendorf2003">(<a href="#ref-urbina2023" role="doc-biblioref">Urbina et al. 2023</a>; <a href="#ref-tischendorf2003" role="doc-biblioref">Tischendorf et al. 2003</a>)</span>, so two structurally identical landscapes can differ greatly depending on whether the target species treats roads, rivers, or fields as permeable or as barriers. A resistance surface calibrated for one species therefore cannot simply be reused for another. This distinction matters in the Swiss Mittelland, which looks connected on a coarse map but is functionally fragmented for large mammals by dense road and rail networks, urban development, and intensive agriculture, leading to reduced gene flow and limited recolonisation for species such as red deer and wild boar <span class="citation" data-cites="fischer2024 urbina2023">(<a href="#ref-fischer2024" role="doc-biblioref">Fischer et al. 2024</a>; <a href="#ref-urbina2023" role="doc-biblioref">Urbina et al. 2023</a>)</span>.</p>
+</section>
+<section id="modeling-functional-connectivity" class="level2" data-number="2">
+<h2 data-number="2" class="anchored" data-anchor-id="modeling-functional-connectivity"><span class="header-section-number">2</span> Modeling Functional Connectivity</h2>
+<p>The following section provides a theoretical explanation of all the modeling methods for functional connectivity used in this study.</p>
+<section id="resistance-surfaces-and-the-integrated-step-selection-function" class="level3" data-number="2.1">
+<h3 data-number="2.1" class="anchored" data-anchor-id="resistance-surfaces-and-the-integrated-step-selection-function"><span class="header-section-number">2.1</span> Resistance Surfaces and the Integrated Step-Selection Function</h3>
+<p>The resistance surface is the core spatial input to all functional connectivity models. It is a raster in which each cell carries a value representing the relative cost of movement, with high-quality habitat assigned low resistance and barriers such as motorways assigned very high or infinite resistance. Resistance can be assigned from expert judgement or, more defensibly, estimated empirically from GPS tracking. <span class="citation" data-cites="urbina2023">Urbina et al. (<a href="#ref-urbina2023" role="doc-biblioref">2023</a>)</span> derived resistance for red deer from over 85,000 GPS fixes of 15 individuals across the Greater Geneva agglomeration at 5-metre resolution, and <span class="citation" data-cites="fischer2024">Fischer et al. (<a href="#ref-fischer2024" role="doc-biblioref">2024</a>)</span> applied a comparable empirical framework to the Swiss Mittelland. Finer resolution resolves the narrow infrastructure that constrains large-mammal movement but multiplies the cell count and the computational cost.</p>
+<p>Where GPS data are available, the integrated step-selection function (iSSF) provides a principled basis for the empirical approach <span class="citation" data-cites="avgar2016">(<a href="#ref-avgar2016" role="doc-biblioref">Avgar et al. 2016</a>)</span>. The iSSF reconstructs movement as a sequence of steps, each with a step length and turning angle, and compares every observed step against random alternatives drawn from the same movement kernel. Fitting a conditional logistic regression of the form <span class="math inline">\(w(\mathbf{x}) = \exp\left(\sum_k \hat{\beta}_k x_k\right)\)</span>, where <span class="math inline">\(w(\mathbf{x})\)</span> is the relative selection strength of a step ending at covariate values <span class="math inline">\(x_k\)</span> and <span class="math inline">\(\hat{\beta}_k\)</span> is the estimated selection coefficient for covariate <span class="math inline">\(k\)</span>, yields coefficients that express habitat preference while holding movement capacity and availability constant. This separates genuine preference from mere abundance: an animal seen often in forest may prefer forest, or forest may simply be plentiful where it started, and the conditional design distinguishes the two. The fitted linear predictor is rescaled into a habitat suitability <span class="math inline">\(S \in [0, 1]\)</span>, which <span class="citation" data-cites="keeley2016">Keeley et al. (<a href="#ref-keeley2016" role="doc-biblioref">2016</a>)</span> proposed to convert into resistance through the negative exponential transformation <span class="math inline">\(R = \exp\left(c \cdot (1 - S)\right)\)</span>, where <span class="math inline">\(c\)</span> is a positive constant that controls how sharply resistance increases as suitability declines. A single tracking dataset therefore yields a resistance surface that is both species-specific and statistically grounded.</p>
+<p>This text and any content here appears only in the HTML output.</p>
+<div class="cell">
+<div class="cell-output-display">
+<div id="fig-issf-schematic" class="quarto-float quarto-figure quarto-figure-center anchored">
+<figure class="quarto-float quarto-float-fig figure">
+<div aria-describedby="fig-issf-schematic-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<img src="3-literatur_files/figure-html/fig-issf-schematic-1.png" class="img-fluid figure-img" width="864">
+</div>
+<figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-issf-schematic-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Figure&nbsp;1: Schematic overview of the iSSF workflow. Left: an observed movement step (solid arrow) is compared against random alternative steps (dashed arrows) to estimate habitat selection coefficients. Right: the coefficients are projected onto a raster, with green cells indicating low resistance and red cells indicating high resistance.
+</figcaption>
+</figure>
+</div>
+</div>
+</div>
+</section>
+<section id="least-cost-paths-and-circuit-theory" class="level3" data-number="2.2">
+<h3 data-number="2.2" class="anchored" data-anchor-id="least-cost-paths-and-circuit-theory"><span class="header-section-number">2.2</span> Least-Cost Paths and Circuit Theory</h3>
+<p>Least-cost path (LCP) analysis was among the first methods to use resistance surfaces for corridor mapping <span class="citation" data-cites="adriaensen2003">(<a href="#ref-adriaensen2003" role="doc-biblioref">Adriaensen et al. 2003</a>)</span>. It identifies the single route between two patches that minimises cumulative resistance. It is computationally cheap and widely used, but it assumes movement along one optimal route and says nothing about whether alternative routes exist or how redundant the surrounding landscape is <span class="citation" data-cites="mcrae2008">(<a href="#ref-mcrae2008" role="doc-biblioref">McRae et al. 2008</a>)</span>.</p>
+<p>Circuit theory addresses that limitation by treating the resistance surface as an electrical network in which current flows from a source to a ground through all available pathways at once <span class="citation" data-cites="mcrae2008">(<a href="#ref-mcrae2008" role="doc-biblioref">McRae et al. 2008</a>)</span>. <span class="citation" data-cites="mcrae2008">McRae et al. (<a href="#ref-mcrae2008" role="doc-biblioref">2008</a>)</span> showed that the current through any cell is proportional to the expected number of times a random walker would pass through it, giving the method a process-based interpretation that LCP lacks. High current density marks heavily used corridors, and points where the landscape forces nearly all movement through a single passage are called pinch points, which are the highest-priority targets for intervention because losing a small area there disproportionately reduces connectivity. Because effective resistance falls as parallel routes are added, the method also captures redundancy, and the ratio of least-cost to resistance distance measures how much a single bottleneck dominates. The Circuitscape software solves networks of millions of cells, making it applicable at landscape scale. <span class="citation" data-cites="urbina2023">Urbina et al. (<a href="#ref-urbina2023" role="doc-biblioref">2023</a>)</span> applied Circuitscape 5 to a graph of 172 core areas and 424 links in Greater Geneva, mapping the major corridors and confirming the role of specific wildlife overpasses.</p>
+<div class="cell">
+<div class="cell-output-display">
+<div id="fig-lcp-circuit-schematic" class="quarto-float quarto-figure quarto-figure-center anchored">
+<figure class="quarto-float quarto-float-fig figure">
+<div aria-describedby="fig-lcp-circuit-schematic-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<img src="3-literatur_files/figure-html/fig-lcp-circuit-schematic-1.png" class="img-fluid figure-img" width="1056">
+</div>
+<figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-lcp-circuit-schematic-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Figure&nbsp;2: Comparison of least-cost path (LCP) and circuit-theory corridor modelling on the same resistance surface. Left: LCP identifies a single optimal route (red line) between source (S) and destination (D) through the lowest-resistance gap. Right: Circuit theory distributes current across all possible pathways simultaneously, with high current density (yellow) highlighting the pinch point where movement is most concentrated.
+</figcaption>
+</figure>
+</div>
+</div>
+</div>
+</section>
+<section id="infection-risk-kernels-and-cost-distance-dispersal" class="level3" data-number="2.3">
+<h3 data-number="2.3" class="anchored" data-anchor-id="infection-risk-kernels-and-cost-distance-dispersal"><span class="header-section-number">2.3</span> Infection-Risk Kernels and Cost-Distance Dispersal</h3>
+<p>An infection-risk kernel converts a cost-distance analysis into the probability that a dispersing infected animal reaches a given location before dying. Dispersal is described by an exponential kernel <span class="math inline">\(P(d) = \exp(-d/D)\)</span>, where <span class="math inline">\(d\)</span> is a distance measure and <span class="math inline">\(D\)</span> is a characteristic dispersal scale set from telemetry. The single parameter <span class="math inline">\(D\)</span> has a direct probabilistic interpretation and can be read from the literature. For wild boar, the relevant scale during the infectious period is the mean natal dispersal distance rather than the home-range diameter, because infected animals move normally until the final clinical phase. Telemetry and mark-recapture studies across European populations report mean dispersal of approximately 4 kilometres, with most events within 10 kilometres of the birth site <span class="citation" data-cites="truve2003 keuling2010 prevot2013 morelle2015">(<a href="#ref-truve2003" role="doc-biblioref">Truvé and Lemel 2003</a>; <a href="#ref-keuling2010" role="doc-biblioref">Keuling et al. 2010</a>; <a href="#ref-prevot2013" role="doc-biblioref">Prévot and Licoppe 2013</a>; <a href="#ref-morelle2015" role="doc-biblioref">Morelle et al. 2015</a>)</span>. Critically, <span class="math inline">\(d\)</span> is taken as Dijkstra cost-distance through the resistance surface rather than straight-line distance, so the kernel assigns near-zero risk to cells that are geographically close but separated by a motorway or large water body. The EFSA operational framework gives a validation benchmark <span class="citation" data-cites="efsa2018">(<a href="#ref-efsa2018" role="doc-biblioref">European Food Safety Authority (EFSA) 2018</a>)</span>: the 3-kilometre protection zone corresponds to a risk of about 0.50 under the kernel with <span class="math inline">\(D = 4\)</span> km, and the 10-kilometre surveillance boundary to about 0.08, which lets the displayed risk classes be anchored to recognised thresholds.</p>
+<div class="cell">
+<div class="cell-output-display">
+<div id="fig-kernel-schematic" class="quarto-float quarto-figure quarto-figure-center anchored">
+<figure class="quarto-float quarto-float-fig figure">
+<div aria-describedby="fig-kernel-schematic-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<img src="3-literatur_files/figure-html/fig-kernel-schematic-1.png" class="img-fluid figure-img" width="624">
+</div>
+<figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-kernel-schematic-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Figure&nbsp;3: Schematic of the cost-distance infection-risk kernel. Risk decays exponentially from the outbreak origin. Because distance is measured through the resistance surface rather than in a straight line, a barrier casts a low-risk shadow: location B, behind the barrier, carries far lower risk than location A at the same straight-line distance in open terrain. Dashed and dotted circles mark the EFSA protection (about 3 km) and surveillance (about 10 km) thresholds.
+</figcaption>
+</figure>
+</div>
+</div>
+</div>
+</section>
+<section id="biased-correlated-random-walk" class="level3" data-number="2.4">
+<h3 data-number="2.4" class="anchored" data-anchor-id="biased-correlated-random-walk"><span class="header-section-number">2.4</span> Biased Correlated Random Walk</h3>
+<p>A biased correlated random walk (BCRW) models movement as discrete steps shaped by two forces: directional memory, which correlates successive steps, and an environmental bias toward low-cost terrain <span class="citation" data-cites="turchin1998 codling2008">(<a href="#ref-turchin1998" role="doc-biblioref">Turchin 1998</a>; <a href="#ref-codling2008" role="doc-biblioref">Codling et al. 2008</a>)</span>. Directional persistence is described by the von Mises distribution, where the probability of a turn <span class="math inline">\(\theta\)</span> is proportional to <span class="math inline">\(\exp(\kappa \cos\theta)\)</span> and the concentration <span class="math inline">\(\kappa\)</span> controls how strongly the walker continues in its current direction. Weighting each candidate step by the inverse of destination resistance and step length adds the cost bias. As the number of walks grows, the BCRW visit density converges toward the circuit-theory current map under the Randomized Shortest Paths equivalence <span class="citation" data-cites="panzacchi2016">(<a href="#ref-panzacchi2016" role="doc-biblioref">Panzacchi et al. 2016</a>)</span>, so the two methods estimate the same quantity by different means. In practice this limit is reached only with very many walks, which makes the BCRW a useful complementary diagnostic rather than a replacement for circuit theory.</p>
+<div class="cell">
+<div class="cell-output-display">
+<div id="fig-bcrw-schematic" class="quarto-float quarto-figure quarto-figure-center anchored">
+<figure class="quarto-float quarto-float-fig figure">
+<div aria-describedby="fig-bcrw-schematic-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<img src="3-literatur_files/figure-html/fig-bcrw-schematic-1.png" class="img-fluid figure-img" width="624">
+</div>
+<figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-bcrw-schematic-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Figure&nbsp;4: Schematic of a biased correlated random walk. Several stochastic trajectories start from the same source. Directional persistence keeps successive steps roughly aligned, while a bias toward low-cost terrain steers the walks along the low-resistance corridor (green band). Accumulated over many walks, the visit density approximates the circuit-theory current map.
+</figcaption>
+</figure>
+</div>
+</div>
+</div>
+</section>
+<section id="individual-based-movement-models" class="level3" data-number="2.5">
+<h3 data-number="2.5" class="anchored" data-anchor-id="individual-based-movement-models"><span class="header-section-number">2.5</span> Individual-Based Movement Models</h3>
+<p>Individual-based movement models take a finer-grained approach by reconstructing movement one step at a time and asking which landscape conditions at the end of each step the animal preferentially selects <span class="citation" data-cites="avgar2016">(<a href="#ref-avgar2016" role="doc-biblioref">Avgar et al. 2016</a>)</span>. The integrated step-selection function (iSSF) introduced above is the most widely used method in this class, and the same machinery that calibrates the resistance surface can also drive a forward simulation of individual trajectories. Rather than solving for a global flow as circuit theory does, an iSSF-based individual-based movement model (IBMM) releases simulated agents into the landscape and lets each one move according to the fitted step-length and turning-angle kernels, selecting successive cells in proportion to their estimated habitat suitability. Because the suitability surface is recovered directly from the iSSF coefficients, the simulated paths reflect the same empirically estimated preferences that define the resistance surface, which makes the IBMM a behaviourally explicit complement to the aggregate corridor methods. Its particular value for disease work is that each agent can be given a finite lifespan drawn from an infectious-period distribution, so the accumulated visit pattern estimates how far an infected animal is likely to spread contamination before dying rather than only where movement is possible <span class="citation" data-cites="avgar2016">(<a href="#ref-avgar2016" role="doc-biblioref">Avgar et al. 2016</a>)</span>.</p>
+<div class="cell">
+<div class="cell-output-display">
+<div id="fig-ibmm-schematic" class="quarto-float quarto-figure quarto-figure-center anchored">
+<figure class="quarto-float quarto-float-fig figure">
+<div aria-describedby="fig-ibmm-schematic-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<img src="3-literatur_files/figure-html/fig-ibmm-schematic-1.png" class="img-fluid figure-img" width="1056">
+</div>
+<figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-ibmm-schematic-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Figure&nbsp;5: Schematic of the iSSF-based movement simulation. Left: simulated agents move step by step through the resistance surface, with each trajectory terminating after a drawn infectious lifespan (square endpoints). At each step, 25 candidate steps (dotted grey) are sampled from the movement kernel and the realised step (solid black) is selected based on habitat suitability. Right: aggregating many agent trajectories produces a spatial contamination footprint showing the likely spread extent from the source patch.
+</figcaption>
+</figure>
+</div>
+</div>
+</div>
+</section>
+</section>
+<section id="wild-boar-ecology" class="level2" data-number="3">
+<h2 data-number="3" class="anchored" data-anchor-id="wild-boar-ecology"><span class="header-section-number">3</span> Wild Boar Ecology</h2>
+<p>The wild boar (<em>Sus scrofa</em>) is a native Eurasian ungulate whose European populations have expanded strongly in recent decades, driven by milder winters, the spread of maize and other high-energy crops, reduced hunting pressure, and supplementary winter feeding <span class="citation" data-cites="guberti2019">(<a href="#ref-guberti2019" role="doc-biblioref">Guberti et al. 2019</a>)</span>. Wild boar are habitat generalists that use woodland, especially deciduous and mixed forest, as daytime resting cover and forage at night in agricultural fields, showing marked behavioural flexibility in fragmented and peri-urban landscapes <span class="citation" data-cites="morelle2015">(<a href="#ref-morelle2015" role="doc-biblioref">Morelle et al. 2015</a>)</span>. This forest dependence for cover and avoidance of human infrastructure is what a resistance surface must capture. Home ranges are usually well below 50 square kilometres and movement contracts where food is stable and abundant <span class="citation" data-cites="guberti2019 morelle2015">(<a href="#ref-guberti2019" role="doc-biblioref">Guberti et al. 2019</a>; <a href="#ref-morelle2015" role="doc-biblioref">Morelle et al. 2015</a>)</span>. The epidemiologically important exception is natal dispersal by young males, which can cover much greater distances and, rarely, exceed 100 kilometres <span class="citation" data-cites="guberti2019">(<a href="#ref-guberti2019" role="doc-biblioref">Guberti et al. 2019</a>)</span>, because a dispersing animal in the incubation phase can carry infection into previously unaffected areas.</p>
+<p>Movement ecology commonly separates an animal’s trajectory into two distinct behavioural states that alternate as it moves through a heterogeneous landscape: localized, resource-oriented behaviour within a habitat patch, and directed, fast transit between patches across the surrounding matrix. In-patch movement is characterised by short steps, frequent changes in direction and extended residence time, reflecting activities such as foraging, resting or social interaction within an area the animal already knows and uses regularly <span class="citation" data-cites="podgorski2013">(<a href="#ref-podgorski2013" role="doc-biblioref">Podgórski et al. 2013</a>)</span>. In-matrix movement, by contrast, consists of comparatively long, directionally persistent steps that connect separate patches and minimise the time spent in less suitable surrounding terrain <span class="citation" data-cites="clontz2021">(<a href="#ref-clontz2021" role="doc-biblioref">Clontz et al. 2021</a>)</span>. The distinction matters for resistance-based connectivity modelling because such models are meant to represent the cost of moving between habitats, so they should be calibrated on the transit portions of the telemetry record rather than on the localized behaviour that otherwise dominates it. Identifying these transit segments from raw GPS data by combining step length and turning angle thresholds, and requiring several consecutive steps to meet these criteria before classifying a sequence as directed transit, is an established way of separating genuine in-matrix movement from isolated long steps that can arise from GPS measurement noise <span class="citation" data-cites="benhamou2014">(<a href="#ref-benhamou2014" role="doc-biblioref">Benhamou 2014</a>)</span>.</p>
+</section>
+<section id="african-swine-fever-and-the-connectivity-trade-off" class="level2" data-number="4">
+<h2 data-number="4" class="anchored" data-anchor-id="african-swine-fever-and-the-connectivity-trade-off"><span class="header-section-number">4</span> African Swine Fever and the Connectivity Trade-off</h2>
+<p>ASF is caused by a large DNA virus of the family <em>Asfarviridae</em> that in Europe affects only domestic pigs and wild boar <span class="citation" data-cites="guberti2019">(<a href="#ref-guberti2019" role="doc-biblioref">Guberti et al. 2019</a>)</span>. The genotype II strain of the current epidemic has a case fatality rate of 90 to 95 percent, most infected animals die within four to nine days of showing signs, and no licensed vaccine exists, so control depends on surveillance, movement restriction, and population management. The virus is exceptionally stable, remaining infectious in blood for up to 15 weeks and persisting in carcasses for months, so infected carcasses act as long-lived reservoirs that decouple persistence from host density <span class="citation" data-cites="guberti2019">(<a href="#ref-guberti2019" role="doc-biblioref">Guberti et al. 2019</a>)</span>. Transmission runs through direct contact, which depends on host density, and through contact with carcasses and fomites, which sustains the cycle even as the live population declines. Since its introduction to the Caucasus in 2007, ASF has advanced westward at roughly 1 to 3 kilometres per month through wild boar populations, with human-induced outbreaks that form new clusters ahead of the front, leaving currently disease-free countries including Switzerland at near-term risk <span class="citation" data-cites="guberti2019">(<a href="#ref-guberti2019" role="doc-biblioref">Guberti et al. 2019</a>)</span>.</p>
+<p>The more connected and continuous the wild boar population, the faster the epidemic spread advances, while natural or artificial barriers can slow it. This makes connectivity a genuine management variable: authorities can in principle reduce spread by reinforcing barriers, installing targeted fencing in high-connectivity areas, or lowering density in specific corridors. Doing so effectively requires knowing where the corridors and pinch points are and predicting how an intervention would change them. <span class="citation" data-cites="hess1994">Hess (<a href="#ref-hess1994" role="doc-biblioref">1994</a>)</span> provided formal support for this and demonstrated that conservation corridors generally aid metapopulation persistence but, under conditions of high direct-contact transmission and high disease-induced mortality that closely match ASF, can substantially raise the risk of disease-driven extinction. The same corridors that benefit red deer can therefore accelerate ASF in wild boar. Existing models, including those of <span class="citation" data-cites="fischer2024">Fischer et al. (<a href="#ref-fischer2024" role="doc-biblioref">2024</a>)</span> and <span class="citation" data-cites="urbina2023">Urbina et al. (<a href="#ref-urbina2023" role="doc-biblioref">2023</a>)</span>, are rigorous but static and cannot answer what-if questions about a proposed fence or overpass. Building a tool that combines their methodological rigour with interactive, user-defined scenarios for wild boar in the Canton of Zürich is the central task of this thesis.</p>
+
+
+<div id="refs" class="references csl-bib-body hanging-indent" role="list">
+<div id="ref-adriaensen2003" class="csl-entry" role="listitem">
+Adriaensen, Frank, Jean Paul Chardon, Geert De Blust, et al. 2003. <span>“The Application of <span>‘Least-Cost’</span> Modelling as a Functional Landscape Model.”</span> <em>Landscape and Urban Planning</em> 64 (4): 233–47. <a href="https://doi.org/10.1016/S0169-2046(02)00242-6">https://doi.org/10.1016/S0169-2046(02)00242-6</a>.
+</div>
+<div id="ref-avgar2016" class="csl-entry" role="listitem">
+Avgar, Tal, Jonathan R. Potts, Mark A. Lewis, and Mark S. Boyce. 2016. <span>“Integrated Step Selection Analysis: Bridging the Gap Between Resource Selection and Animal Movement.”</span> <em>Methods in Ecology and Evolution</em> 7 (5): 619–30. <a href="https://doi.org/10.1111/2041-210X.12528">https://doi.org/10.1111/2041-210X.12528</a>.
+</div>
+<div id="ref-benhamou2014" class="csl-entry" role="listitem">
+Benhamou, Simon. 2014. <span>“Of Scales and Stationarity in Animal Movements.”</span> <em>Ecology Letters</em> 17 (3): 261–72. <a href="https://doi.org/10.1111/ele.12225">https://doi.org/10.1111/ele.12225</a>.
+</div>
+<div id="ref-clontz2021" class="csl-entry" role="listitem">
+Clontz, Lindsay M., Kim M. Pepin, Kurt C. VerCauteren, and James C. Beasley. 2021. <span>“Behavioral State Resource Selection in Invasive Wild Pigs in the Southeastern United States.”</span> <em>Scientific Reports</em> 11: 6924. <a href="https://doi.org/10.1038/s41598-021-86363-3">https://doi.org/10.1038/s41598-021-86363-3</a>.
+</div>
+<div id="ref-codling2008" class="csl-entry" role="listitem">
+Codling, Edward A., Michael J. Plank, and Simon Benhamou. 2008. <span>“Random Walk Models in Biology.”</span> <em>Journal of the Royal Society Interface</em> 5 (25): 813–34. <a href="https://doi.org/10.1098/rsif.2008.0014">https://doi.org/10.1098/rsif.2008.0014</a>.
+</div>
+<div id="ref-efsa2018" class="csl-entry" role="listitem">
+European Food Safety Authority (EFSA). 2018. <span>“Epidemiological Analyses of African Swine Fever in the European Union (November 2017 Until November 2018).”</span> <em>EFSA Journal</em> 16 (11): e05494. <a href="https://doi.org/10.2903/j.efsa.2018.5494">https://doi.org/10.2903/j.efsa.2018.5494</a>.
+</div>
+<div id="ref-fischer2024" class="csl-entry" role="listitem">
+Fischer, Claude, Claudio Signer, Christian Willisch, et al. 2024. <em>Forschungsprogramm Rothirsch Im Schweizer Mittelland – Abschlussbericht</em>. Abschlussbericht. HEPIA Jussy, ZHAW Wädenswil und HAFL Zollikofen.
+</div>
+<div id="ref-guberti2019" class="csl-entry" role="listitem">
+Guberti, Vittorio, Sergei Khomenko, Marius Masiulis, and Suzanne Kerba. 2019. <em>African Swine Fever in Wild Boar – Ecology and Biosecurity</em>. FAO Animal Production and Health Manual No. 22. Food; Agriculture Organization of the United Nations (FAO), World Organisation for Animal Health (OIE); European Commission. <a href="https://doi.org/10.4060/CA5987EN">https://doi.org/10.4060/CA5987EN</a>.
+</div>
+<div id="ref-hess1994" class="csl-entry" role="listitem">
+Hess, George R. 1994. <span>“Conservation Corridors and Contagious Disease: A Cautionary Note.”</span> <em>Conservation Biology</em> 8 (1): 256–62. <a href="https://doi.org/10.1046/j.1523-1739.1994.08010256.x">https://doi.org/10.1046/j.1523-1739.1994.08010256.x</a>.
+</div>
+<div id="ref-keeley2016" class="csl-entry" role="listitem">
+Keeley, Annika T. H., Paul Beier, and Jeffrey W. Gagnon. 2016. <span>“Estimating Landscape Resistance from Habitat Suitability: Effects of Data Source and Nonlinearities.”</span> <em>Landscape Ecology</em> 31 (9): 2151–62. <a href="https://doi.org/10.1007/s10980-016-0387-5">https://doi.org/10.1007/s10980-016-0387-5</a>.
+</div>
+<div id="ref-keuling2010" class="csl-entry" role="listitem">
+Keuling, Oliver, Kirstin Lauterbach, Norman Stier, and Mechthild Roth. 2010. <span>“Hunter Feedback of Individually Marked Wild Boar <span class="nocase">Sus scrofa</span> l.: Dispersal and Efficiency of Hunting in Northeastern Germany.”</span> <em>European Journal of Wildlife Research</em> 56 (2): 159–67. <a href="https://doi.org/10.1007/s10344-009-0296-x">https://doi.org/10.1007/s10344-009-0296-x</a>.
+</div>
+<div id="ref-mcrae2008" class="csl-entry" role="listitem">
+McRae, Brad H., Brett G. Dickson, Timothy H. Keitt, and Viral B. Shah. 2008. <span>“Using Circuit Theory to Model Connectivity in Ecology, Evolution, and Conservation.”</span> <em>Ecology</em> 89 (10): 2712–24. <a href="https://doi.org/10.1890/07-1861.1">https://doi.org/10.1890/07-1861.1</a>.
+</div>
+<div id="ref-morelle2015" class="csl-entry" role="listitem">
+Morelle, Kevin, Tomasz Podgórski, Céline Prévot, Oliver Keuling, François Lehaire, and Philippe Lejeune. 2015. <span>“Towards Understanding Wild Boar <span class="nocase">Sus scrofa</span> Movement: A Synthetic Movement Ecology Approach.”</span> <em>Mammal Review</em> 45 (1): 15–29. <a href="https://doi.org/10.1111/mam.12028">https://doi.org/10.1111/mam.12028</a>.
+</div>
+<div id="ref-panzacchi2016" class="csl-entry" role="listitem">
+Panzacchi, Manuela, Bram Van Moorter, Olav Strand, et al. 2016. <span>“Predicting the Continuum Between Corridors and Barriers to Animal Movements Using Step Selection Functions and Randomized Shortest Paths.”</span> <em>Journal of Animal Ecology</em> 85 (1): 32–42. <a href="https://doi.org/10.1111/1365-2656.12386">https://doi.org/10.1111/1365-2656.12386</a>.
+</div>
+<div id="ref-podgorski2013" class="csl-entry" role="listitem">
+Podgórski, Tomasz, Grzegorz Baś, Bogumiła Jędrzejewska, et al. 2013. <span>“Spatiotemporal Behavioral Plasticity of Wild Boar (<span class="nocase">Sus scrofa</span>) Under Contrasting Conditions of Human Pressure: Primeval Forest and Metropolitan Area.”</span> <em>Journal of Mammalogy</em> 94 (1): 109–19. <a href="https://doi.org/10.1644/12-MAMM-A-038.1">https://doi.org/10.1644/12-MAMM-A-038.1</a>.
+</div>
+<div id="ref-prevot2013" class="csl-entry" role="listitem">
+Prévot, Céline, and Alain Licoppe. 2013. <span>“Comparing Red Deer (<span class="nocase">Cervus elaphus</span> l.) and Wild Boar (<span class="nocase">Sus scrofa</span> l.) Dispersal Patterns in Southern Belgium.”</span> <em>European Journal of Wildlife Research</em> 59 (6): 795–803. <a href="https://doi.org/10.1007/s10344-013-0732-9">https://doi.org/10.1007/s10344-013-0732-9</a>.
+</div>
+<div id="ref-taylor1993" class="csl-entry" role="listitem">
+Taylor, Philip D., Lenore Fahrig, Kringen Henein, and Gray Merriam. 1993. <span>“Connectivity Is a Vital Element of Landscape Structure.”</span> <em>Oikos</em> 68 (3): 571–73. <a href="https://doi.org/10.2307/3544927">https://doi.org/10.2307/3544927</a>.
+</div>
+<div id="ref-tischendorf2003" class="csl-entry" role="listitem">
+Tischendorf, Lutz, Darren J. Bender, and Lenore Fahrig. 2003. <span>“Evaluation of Patch Isolation Metrics in Mosaic Landscapes for Specialist Vs. Generalist Dispersers.”</span> <em>Landscape Ecology</em> 18 (1): 41–50. <a href="https://doi.org/10.1023/A:1022908109982">https://doi.org/10.1023/A:1022908109982</a>.
+</div>
+<div id="ref-truve2003" class="csl-entry" role="listitem">
+Truvé, Johan, and Jonas Lemel. 2003. <span>“Timing and Distance of Natal Dispersal for Wild Boar <span class="nocase">Sus scrofa</span> in Sweden.”</span> <em>Wildlife Biology</em> 9 (S1): 51–57. <a href="https://doi.org/10.2981/wlb.2003.056">https://doi.org/10.2981/wlb.2003.056</a>.
+</div>
+<div id="ref-turchin1998" class="csl-entry" role="listitem">
+Turchin, Peter. 1998. <em>Quantitative Analysis of Movement: Measuring and Modeling Population Redistribution in Animals and Plants</em>. Sinauer Associates.
+</div>
+<div id="ref-urbina2023" class="csl-entry" role="listitem">
+Urbina, Laura, Claude Fischer, Nicolas Ray, and Anthony Lehmann. 2023. <span>“Modeling Red Deer Functional Connectivity at a Regional Scale in a Human-Dominated Landscape.”</span> <em>Frontiers in Environmental Science</em> 11: 1198168. <a href="https://doi.org/10.3389/fenvs.2023.1198168">https://doi.org/10.3389/fenvs.2023.1198168</a>.
+</div>
+</div>
+</section>
+
+</main> <!-- /main -->
+<script id="quarto-html-after-body" type="application/javascript">
+  window.document.addEventListener("DOMContentLoaded", function (event) {
+    const icon = "";
+    const anchorJS = new window.AnchorJS();
+    anchorJS.options = {
+      placement: 'right',
+      icon: icon
+    };
+    anchorJS.add('.anchored');
+    const isCodeAnnotation = (el) => {
+      for (const clz of el.classList) {
+        if (clz.startsWith('code-annotation-')) {                     
+          return true;
+        }
+      }
+      return false;
+    }
+    const onCopySuccess = function(e) {
+      // button target
+      const button = e.trigger;
+      // don't keep focus
+      button.blur();
+      // flash "checked"
+      button.classList.add('code-copy-button-checked');
+      var currentTitle = button.getAttribute("title");
+      button.setAttribute("title", "Copied!");
+      let tooltip;
+      if (window.bootstrap) {
+        button.setAttribute("data-bs-toggle", "tooltip");
+        button.setAttribute("data-bs-placement", "left");
+        button.setAttribute("data-bs-title", "Copied!");
+        tooltip = new bootstrap.Tooltip(button, 
+          { trigger: "manual", 
+            customClass: "code-copy-button-tooltip",
+            offset: [0, -8]});
+        tooltip.show();    
+      }
+      setTimeout(function() {
+        if (tooltip) {
+          tooltip.hide();
+          button.removeAttribute("data-bs-title");
+          button.removeAttribute("data-bs-toggle");
+          button.removeAttribute("data-bs-placement");
+        }
+        button.setAttribute("title", currentTitle);
+        button.classList.remove('code-copy-button-checked');
+      }, 1000);
+      // clear code selection
+      e.clearSelection();
+    }
+    const getTextToCopy = function(trigger) {
+      const outerScaffold = trigger.parentElement.cloneNode(true);
+      const codeEl = outerScaffold.querySelector('code');
+      for (const childEl of codeEl.children) {
+        if (isCodeAnnotation(childEl)) {
+          childEl.remove();
+        }
+      }
+      return codeEl.innerText;
+    }
+    const clipboard = new window.ClipboardJS('.code-copy-button:not([data-in-quarto-modal])', {
+      text: getTextToCopy
+    });
+    clipboard.on('success', onCopySuccess);
+    if (window.document.getElementById('quarto-embedded-source-code-modal')) {
+      const clipboardModal = new window.ClipboardJS('.code-copy-button[data-in-quarto-modal]', {
+        text: getTextToCopy,
+        container: window.document.getElementById('quarto-embedded-source-code-modal')
+      });
+      clipboardModal.on('success', onCopySuccess);
+    }
+      var localhostRegex = new RegExp(/^(?:http|https):\/\/localhost\:?[0-9]*\//);
+      var mailtoRegex = new RegExp(/^mailto:/);
+        var filterRegex = new RegExp('/' + window.location.host + '/');
+      var isInternal = (href) => {
+          return filterRegex.test(href) || localhostRegex.test(href) || mailtoRegex.test(href);
+      }
+      // Inspect non-navigation links and adorn them if external
+     var links = window.document.querySelectorAll('a[href]:not(.nav-link):not(.navbar-brand):not(.toc-action):not(.sidebar-link):not(.sidebar-item-toggle):not(.pagination-link):not(.no-external):not([aria-hidden]):not(.dropdown-item):not(.quarto-navigation-tool):not(.about-link)');
+      for (var i=0; i<links.length; i++) {
+        const link = links[i];
+        if (!isInternal(link.href)) {
+          // undo the damage that might have been done by quarto-nav.js in the case of
+          // links that we want to consider external
+          if (link.dataset.originalHref !== undefined) {
+            link.href = link.dataset.originalHref;
+          }
+        }
+      }
+    function tippyHover(el, contentFn, onTriggerFn, onUntriggerFn) {
+      const config = {
+        allowHTML: true,
+        maxWidth: 500,
+        delay: 100,
+        arrow: false,
+        appendTo: function(el) {
+            return el.parentElement;
+        },
+        interactive: true,
+        interactiveBorder: 10,
+        theme: 'quarto',
+        placement: 'bottom-start',
+      };
+      if (contentFn) {
+        config.content = contentFn;
+      }
+      if (onTriggerFn) {
+        config.onTrigger = onTriggerFn;
+      }
+      if (onUntriggerFn) {
+        config.onUntrigger = onUntriggerFn;
+      }
+      window.tippy(el, config); 
+    }
+    const noterefs = window.document.querySelectorAll('a[role="doc-noteref"]');
+    for (var i=0; i<noterefs.length; i++) {
+      const ref = noterefs[i];
+      tippyHover(ref, function() {
+        // use id or data attribute instead here
+        let href = ref.getAttribute('data-footnote-href') || ref.getAttribute('href');
+        try { href = new URL(href).hash; } catch {}
+        const id = href.replace(/^#\/?/, "");
+        const note = window.document.getElementById(id);
+        if (note) {
+          return note.innerHTML;
+        } else {
+          return "";
+        }
+      });
+    }
+    const xrefs = window.document.querySelectorAll('a.quarto-xref');
+    const processXRef = (id, note) => {
+      // Strip column container classes
+      const stripColumnClz = (el) => {
+        el.classList.remove("page-full", "page-columns");
+        if (el.children) {
+          for (const child of el.children) {
+            stripColumnClz(child);
+          }
+        }
+      }
+      stripColumnClz(note)
+      if (id === null || id.startsWith('sec-')) {
+        // Special case sections, only their first couple elements
+        const container = document.createElement("div");
+        if (note.children && note.children.length > 2) {
+          container.appendChild(note.children[0].cloneNode(true));
+          for (let i = 1; i < note.children.length; i++) {
+            const child = note.children[i];
+            if (child.tagName === "P" && child.innerText === "") {
+              continue;
+            } else {
+              container.appendChild(child.cloneNode(true));
+              break;
+            }
+          }
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(container);
+          }
+          return container.innerHTML
+        } else {
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(note);
+          }
+          return note.innerHTML;
+        }
+      } else {
+        // Remove any anchor links if they are present
+        const anchorLink = note.querySelector('a.anchorjs-link');
+        if (anchorLink) {
+          anchorLink.remove();
+        }
+        if (window.Quarto?.typesetMath) {
+          window.Quarto.typesetMath(note);
+        }
+        if (note.classList.contains("callout")) {
+          return note.outerHTML;
+        } else {
+          return note.innerHTML;
+        }
+      }
+    }
+    for (var i=0; i<xrefs.length; i++) {
+      const xref = xrefs[i];
+      tippyHover(xref, undefined, function(instance) {
+        instance.disable();
+        let url = xref.getAttribute('href');
+        let hash = undefined; 
+        if (url.startsWith('#')) {
+          hash = url;
+        } else {
+          try { hash = new URL(url).hash; } catch {}
+        }
+        if (hash) {
+          const id = hash.replace(/^#\/?/, "");
+          const note = window.document.getElementById(id);
+          if (note !== null) {
+            try {
+              const html = processXRef(id, note.cloneNode(true));
+              instance.setContent(html);
+            } finally {
+              instance.enable();
+              instance.show();
+            }
+          } else {
+            // See if we can fetch this
+            fetch(url.split('#')[0])
+            .then(res => res.text())
+            .then(html => {
+              const parser = new DOMParser();
+              const htmlDoc = parser.parseFromString(html, "text/html");
+              const note = htmlDoc.getElementById(id);
+              if (note !== null) {
+                const html = processXRef(id, note);
+                instance.setContent(html);
+              } 
+            }).finally(() => {
+              instance.enable();
+              instance.show();
+            });
+          }
+        } else {
+          // See if we can fetch a full url (with no hash to target)
+          // This is a special case and we should probably do some content thinning / targeting
+          fetch(url)
+          .then(res => res.text())
+          .then(html => {
+            const parser = new DOMParser();
+            const htmlDoc = parser.parseFromString(html, "text/html");
+            const note = htmlDoc.querySelector('main.content');
+            if (note !== null) {
+              // This should only happen for chapter cross references
+              // (since there is no id in the URL)
+              // remove the first header
+              if (note.children.length > 0 && note.children[0].tagName === "HEADER") {
+                note.children[0].remove();
+              }
+              const html = processXRef(null, note);
+              instance.setContent(html);
+            } 
+          }).finally(() => {
+            instance.enable();
+            instance.show();
+          });
+        }
+      }, function(instance) {
+      });
+    }
+        let selectedAnnoteEl;
+        const selectorForAnnotation = ( cell, annotation) => {
+          let cellAttr = 'data-code-cell="' + cell + '"';
+          let lineAttr = 'data-code-annotation="' +  annotation + '"';
+          const selector = 'span[' + cellAttr + '][' + lineAttr + ']';
+          return selector;
+        }
+        const selectCodeLines = (annoteEl) => {
+          const doc = window.document;
+          const targetCell = annoteEl.getAttribute("data-target-cell");
+          const targetAnnotation = annoteEl.getAttribute("data-target-annotation");
+          const annoteSpan = window.document.querySelector(selectorForAnnotation(targetCell, targetAnnotation));
+          const lines = annoteSpan.getAttribute("data-code-lines").split(",");
+          const lineIds = lines.map((line) => {
+            return targetCell + "-" + line;
+          })
+          let top = null;
+          let height = null;
+          let parent = null;
+          if (lineIds.length > 0) {
+              //compute the position of the single el (top and bottom and make a div)
+              const el = window.document.getElementById(lineIds[0]);
+              top = el.offsetTop;
+              height = el.offsetHeight;
+              parent = el.parentElement.parentElement;
+            if (lineIds.length > 1) {
+              const lastEl = window.document.getElementById(lineIds[lineIds.length - 1]);
+              const bottom = lastEl.offsetTop + lastEl.offsetHeight;
+              height = bottom - top;
+            }
+            if (top !== null && height !== null && parent !== null) {
+              // cook up a div (if necessary) and position it 
+              let div = window.document.getElementById("code-annotation-line-highlight");
+              if (div === null) {
+                div = window.document.createElement("div");
+                div.setAttribute("id", "code-annotation-line-highlight");
+                div.style.position = 'absolute';
+                parent.appendChild(div);
+              }
+              div.style.top = top - 2 + "px";
+              div.style.height = height + 4 + "px";
+              div.style.left = 0;
+              let gutterDiv = window.document.getElementById("code-annotation-line-highlight-gutter");
+              if (gutterDiv === null) {
+                gutterDiv = window.document.createElement("div");
+                gutterDiv.setAttribute("id", "code-annotation-line-highlight-gutter");
+                gutterDiv.style.position = 'absolute';
+                const codeCell = window.document.getElementById(targetCell);
+                const gutter = codeCell.querySelector('.code-annotation-gutter');
+                gutter.appendChild(gutterDiv);
+              }
+              gutterDiv.style.top = top - 2 + "px";
+              gutterDiv.style.height = height + 4 + "px";
+            }
+            selectedAnnoteEl = annoteEl;
+          }
+        };
+        const unselectCodeLines = () => {
+          const elementsIds = ["code-annotation-line-highlight", "code-annotation-line-highlight-gutter"];
+          elementsIds.forEach((elId) => {
+            const div = window.document.getElementById(elId);
+            if (div) {
+              div.remove();
+            }
+          });
+          selectedAnnoteEl = undefined;
+        };
+          // Handle positioning of the toggle
+      window.addEventListener(
+        "resize",
+        throttle(() => {
+          elRect = undefined;
+          if (selectedAnnoteEl) {
+            selectCodeLines(selectedAnnoteEl);
+          }
+        }, 10)
+      );
+      function throttle(fn, ms) {
+      let throttle = false;
+      let timer;
+        return (...args) => {
+          if(!throttle) { // first call gets through
+              fn.apply(this, args);
+              throttle = true;
+          } else { // all the others get throttled
+              if(timer) clearTimeout(timer); // cancel #2
+              timer = setTimeout(() => {
+                fn.apply(this, args);
+                timer = throttle = false;
+              }, ms);
+          }
+        };
+      }
+        // Attach click handler to the DT
+        const annoteDls = window.document.querySelectorAll('dt[data-target-cell]');
+        for (const annoteDlNode of annoteDls) {
+          annoteDlNode.addEventListener('click', (event) => {
+            const clickedEl = event.target;
+            if (clickedEl !== selectedAnnoteEl) {
+              unselectCodeLines();
+              const activeEl = window.document.querySelector('dt[data-target-cell].code-annotation-active');
+              if (activeEl) {
+                activeEl.classList.remove('code-annotation-active');
+              }
+              selectCodeLines(clickedEl);
+              clickedEl.classList.add('code-annotation-active');
+            } else {
+              // Unselect the line
+              unselectCodeLines();
+              clickedEl.classList.remove('code-annotation-active');
+            }
+          });
+        }
+    const findCites = (el) => {
+      const parentEl = el.parentElement;
+      if (parentEl) {
+        const cites = parentEl.dataset.cites;
+        if (cites) {
+          return {
+            el,
+            cites: cites.split(' ')
+          };
+        } else {
+          return findCites(el.parentElement)
+        }
+      } else {
+        return undefined;
+      }
+    };
+    var bibliorefs = window.document.querySelectorAll('a[role="doc-biblioref"]');
+    for (var i=0; i<bibliorefs.length; i++) {
+      const ref = bibliorefs[i];
+      const citeInfo = findCites(ref);
+      if (citeInfo) {
+        tippyHover(citeInfo.el, function() {
+          var popup = window.document.createElement('div');
+          citeInfo.cites.forEach(function(cite) {
+            var citeDiv = window.document.createElement('div');
+            citeDiv.classList.add('hanging-indent');
+            citeDiv.classList.add('csl-entry');
+            var biblioDiv = window.document.getElementById('ref-' + cite);
+            if (biblioDiv) {
+              citeDiv.innerHTML = biblioDiv.innerHTML;
+            }
+            popup.appendChild(citeDiv);
+          });
+          return popup.innerHTML;
+        });
+      }
+    }
+  });
+  </script>
+<nav class="page-navigation">
+  <div class="nav-page nav-page-previous">
+      <a href="./2-einleitung.html" class="pagination-link" aria-label="Introduction">
+        <i class="bi bi-arrow-left-short"></i> <span class="nav-page-text"><span class="chapter-number">1</span>&nbsp; <span class="chapter-title">Introduction</span></span>
+      </a>          
+  </div>
+  <div class="nav-page nav-page-next">
+      <a href="./4-methoden.html" class="pagination-link" aria-label="Material and Methods">
+        <span class="nav-page-text"><span class="chapter-number">3</span>&nbsp; <span class="chapter-title">Material and Methods</span></span> <i class="bi bi-arrow-right-short"></i>
+      </a>
+  </div>
+</nav>
+</div> <!-- /content -->
+
+
+
+
+</body></html>

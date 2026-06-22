@@ -1,6 +1,6 @@
 project:
   type: book
-  output-dir: docs
+  output-dir: ../docs           
 
 book:
   title: "An Interactive Planning Tool for Wild Boar Connectivity and African Swine Fever Prevention"

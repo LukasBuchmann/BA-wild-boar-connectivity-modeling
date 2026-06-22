@@ -304,7 +304,7 @@ window.Quarto = {
 <img src="3-literatur_files/figure-html/fig-issf-schematic-1.png" class="img-fluid figure-img" width="864">
 </div>
 <figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-issf-schematic-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-Figure&nbsp;1: Schematic of the integrated step-selection function and the resulting resistance surface. Left: at each observed location the animal’s realised step (solid arrow) is compared against random available steps (dashed arrows) drawn from its movement kernel, so the model learns which features are selected. Right: the fitted coefficients are translated into a resistance raster, where preferred habitat receives low resistance (green) and barriers such as roads receive high resistance (red).
+Figure&nbsp;1: Schematic overview of the iSSF workflow. Left: an observed movement step (solid arrow) is compared against random alternative steps (dashed arrows) to estimate habitat selection coefficients. Right: the coefficients are projected onto a raster, with green cells indicating low resistance and red cells indicating high resistance.
 </figcaption>
 </figure>
 </div>
@@ -323,7 +323,7 @@ Figure&nbsp;1: Schematic of the integrated step-selection function and the resul
 <img src="3-literatur_files/figure-html/fig-lcp-circuit-schematic-1.png" class="img-fluid figure-img" width="1056">
 </div>
 <figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-lcp-circuit-schematic-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-Figure&nbsp;2: Schematic comparison of least-cost path (LCP) and circuit-theory corridor modelling applied to the same resistance surface. <strong>Left:</strong> The LCP analysis identifies a single optimal route (red line) connecting the source (S) and destination (D) patches by minimising cumulative movement cost, threading through the narrow low-resistance gap between the two high-resistance blocks (dark grey). <strong>Right:</strong> Circuit theory treats the same surface as a resistor network and lets current flow from source to destination through all possible pathways simultaneously. The resulting current density (Magma ramp) does not single out one route but reveals the relative importance of the entire corridor network, concentrating at the pinch point where the landscape forces movement through the narrow passage.
+Figure&nbsp;2: Comparison of least-cost path (LCP) and circuit-theory corridor modelling on the same resistance surface. Left: LCP identifies a single optimal route (red line) between source (S) and destination (D) through the lowest-resistance gap. Right: Circuit theory distributes current across all possible pathways simultaneously, with high current density (yellow) highlighting the pinch point where movement is most concentrated.
 </figcaption>
 </figure>
 </div>
@@ -377,7 +377,7 @@ Figure&nbsp;4: Schematic of a biased correlated random walk. Several stochastic 
 <img src="3-literatur_files/figure-html/fig-ibmm-schematic-1.png" class="img-fluid figure-img" width="1056">
 </div>
 <figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-ibmm-schematic-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-Figure&nbsp;5: Schematic of the iSSF-based individual-based movement model. Left: simulated agents move step by step according to the fitted movement and habitat-selection kernels, with each trajectory ending when the agent’s drawn infectious-period lifespan elapses (square endpoints). The inset fan at one location illustrates how, at every step, the model draws 25 candidate ‘available’ steps from the fitted step-length and turning-angle kernels (dotted grey) and selects the realised ‘used’ step (solid black) in proportion to its estimated habitat suitability. Right: accumulating these finite-lifespan trajectories over many agents yields a spatial footprint of how far and in which directions contamination is likely to spread from the source before the agents die.
+Figure&nbsp;5: Schematic of the iSSF-based movement simulation. Left: simulated agents move step by step through the resistance surface, with each trajectory terminating after a drawn infectious lifespan (square endpoints). At each step, 25 candidate steps (dotted grey) are sampled from the movement kernel and the realised step (solid black) is selected based on habitat suitability. Right: aggregating many agent trajectories produces a spatial contamination footprint showing the likely spread extent from the source patch.
 </figcaption>
 </figure>
 </div>

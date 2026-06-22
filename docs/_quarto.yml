@@ -1,0 +1,69 @@
+project:
+  type: book
+  output-dir: _site           
+
+book:
+  title: "An Interactive Planning Tool for Wild Boar Connectivity and African Swine Fever Prevention"
+  subtitle: "A QGIS plugin for scenario-based connectivity modelling in the Canton of Zürich"
+  author:
+    - Lukas Buchmann
+  date: "2026-07-02"
+  downloads: pdf
+  chapters:
+    - file: index.qmd
+      text: "Front Page"
+    - 1-zusammenfassung.qmd
+    - 1b-abkuerzungen.qmd
+    - 2-einleitung.qmd
+    - 3-literatur.qmd
+    - 4-methoden.qmd
+    - 5-ergebnisse.qmd
+    - 6-diskussion.qmd
+    - references.qmd
+  appendices:
+    - 7-anhang-rohdaten.qmd
+    - 8-anhang-statistik.qmd
+    - 9-anhang-ki.qmd
+    - 10-anhang-reproduzierbarkeit.qmd
+
+bibliography: references.bib
+lang: en
+prefer-html: true
+
+# Number figures/tables continuously across the whole document (1..N) in both
+# HTML and PDF, rather than per-chapter. For the typst PDF this is also enforced
+# by a counter-restore rule in index.qmd (see the {=typst} block there), which
+# cancels Quarto's per-chapter counter reset that the custom zhaw-lsfm template
+# would otherwise render without a chapter prefix (causing duplicate "Figure 1").
+crossref:
+  chapters: false
+
+institut: "Institute for Computational Life Sciences"
+keywords: "wild boar, Sus scrofa, African swine fever, landscape connectivity, resistance surface, circuit theory, step-selection function, QGIS plugin, Canton Zürich"
+confidential: false
+zhaw-cover-image:
+  src: cover.png
+  max-width: 100%
+  max-height: 5cm
+thesis-type: "Bachelor Thesis"
+degree-type: "Bachelor of Science in Applied Digital Life Sciences"
+study-year: "2026"
+submission-date: "2026-07-02"
+study-direction: "Digital Environment"
+supervisors:
+  - title:
+    name: "Ratnaweera Nils"
+    affiliation: "ZHAW Life Sciences und Facility Management, Wädenswil"
+    research-group: "Geoinformatik"
+  - title:
+    name: "Sigrist Benjamin"
+    affiliation: "ZHAW Life Sciences und Facility Management, Wädenswil"
+    research-group: "Wildtiermanagement (WILMA)"
+
+format:
+  zhaw-lsfm-html: default
+  zhaw-lsfm-typst:
+    prefer-html: true
+    include-in-header:
+      text: |
+        #show figure.caption: set text(size: 0.85em)

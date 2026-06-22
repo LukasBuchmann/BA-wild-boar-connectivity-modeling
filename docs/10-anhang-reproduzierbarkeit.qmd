@@ -8,9 +8,17 @@ The analytical workflow is split across two components. The resistance surface p
 
 ## Software Environment
 
-The ecological algorithm was developed in R 4.5.1 using `terra` 1.9.11, `sf` 1.1.0, `amt` 0.3.1.0, `survival` 3.8.3, `broom` 1.0.10, `car`, and the tidyverse packages `dplyr`, `tidyr`, `purrr`, and `lubridate`. The plugin was implemented for QGIS 3.40.13 in Python, with Circuitscape.jl invoked through a Julia subprocess and a scipy sparse fallback solver. 
-
-Here I have to insert the Python packages aswell.
+The ecological algorithm was developed in R 4.5.1 using `terra` 1.9.11, `sf` 1.1.0,
+`amt` 0.3.1.0, `survival` 3.8.3, `broom` 1.0.10, `car`, and the tidyverse packages
+`dplyr`, `tidyr`, `purrr`, and `lubridate`. The plugin was implemented for QGIS 3.40.13
+in Python. Core spatial operations relied on `rasterio` 1.4.3 (raster I/O and
+rasterization), `numpy` 1.26.2 (array manipulation and resistance editing), `scipy`
+1.12.0 (connected-component labeling via `scipy.ndimage` and the sparse Laplacian
+fallback solver via `scipy.sparse`), and `scikit-image` 0.25.1 (least-cost path
+tracing via `skimage.graph.MCP_Geometric`). The QGIS framework itself (PyQGIS, PyQt5)
+is bundled with QGIS 3.40.13 and is not a pip-installed dependency. Circuit-theory
+analysis was performed by Circuitscape.jl invoked through a Julia subprocess, with
+the scipy sparse solver as a pure-Python fallback.
 
 ## Directory Structure
 

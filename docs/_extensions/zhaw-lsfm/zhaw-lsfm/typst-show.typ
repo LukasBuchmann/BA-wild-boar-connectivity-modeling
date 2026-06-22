@@ -64,6 +64,7 @@ $for(supervisors)$
       title: [$supervisors.title$],
       name: [$supervisors.name$],
       affiliation: [$supervisors.affiliation$],
+      research-group: [$supervisors.research-group$],
     ),
 $endfor$
   ),

@@ -167,6 +167,7 @@
           #for supervisor in supervisors [
             #if supervisor.title != none [#supervisor.title] #supervisor.name \
             #supervisor.affiliation \
+            #supervisor.research-group \
             \
           ]
         ]

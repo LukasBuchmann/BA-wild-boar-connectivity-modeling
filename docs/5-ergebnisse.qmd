@@ -190,9 +190,13 @@ p_ta_patch <- ggplot(df_patch, aes(x = ta_)) +
 (p_sl_in + p_ta_in) / (p_sl_patch + p_ta_patch)
 ```
 
-### Intermediate Spatial Covariate Layers
+### Intermediate Spatial Covariate Layers and iSSF Fitting
 
-Fourteen spatial covariates were assembled on the 25-metre Aargau grid before VIF testing. These are presented below in functional groups. Layers included in the final iSSF model are labelled accordingly. Excluded layers are shown to document the full intermediate output of the pipeline and to provide spatial context for understanding the final resistance surface structure. For all distance rasters, values are in metres measured as Euclidean distance to the nearest cell of the target feature class. For all density and suitability rasters, values range from 0 to 1. Binary barrier and passage rasters contain value 1 where the feature is present and are stored as NoData elsewhere.
+Fourteen spatial covariates were assembled on the 25-metre Aargau grid before VIF testing. For all distance rasters, values are in metres measured as Euclidean distance to the nearest cell of the target feature class. For all density and suitability rasters, values range from 0 to 1. Binary barrier and passage rasters contain value 1 where the feature is present and are stored as NoData elsewhere.
+
+Seven statistically significant covariates were retained for the iSSF Fitting. They are all positive and their confidence intervals exclude zero. Forest density at the 50-metre scale and distance to railway show the highest beta coefficients with similar point estimates, but the railway coefficient carries a markedly wider interval. Distance to water shows the weakest effect, though it remains statistically significant.
+
+![iSSF selection coefficients (β) with 95% confidence intervals for the seven retained covariates, ordered by effect size. All estimates are positive and exclude zero. The dashed line marks β = 0.](images/issf_coefficients-2.png){#fig-issf-coefficients}
 
 :::: {.content-visible when-format="html"}
 ## Interactive Raster Viewer
@@ -305,8 +309,7 @@ leaflet(options = leafletOptions(minZoom = 8)) |>
             position = "bottomright", group = "Habitat Suitability — Zürich") |>
   addLegend(pal = pal_res, values = c(1, 55), title = "Resistance (R)",
             position = "bottomright", group = "Resistance — Zürich") |>
-  # Default view: only Resistance — Zürich (and its legend) shown. Hiding the
-  # other three AFTER the legends removes their legends via the groupremove event.
+  # Default view: only Resistance — Zürich (and its legend) shown.
   hideGroup(c("Habitat Suitability — Aargau",
               "Resistance — Aargau",
               "Habitat Suitability — Zürich"))
@@ -318,8 +321,6 @@ leaflet(options = leafletOptions(minZoom = 8)) |>
 #| label: map-forest
 #| eval: !expr knitr::is_html_output()
 
-# Dedicated palette for distance-to-forest-edge (metres) so its own legend is
-# meaningful (this layer was previously drawn on the 0–1 forest-density scale).
 pal_dfe <- colorNumeric(hcl.colors(100, "Greens"),
                         domain = range(lf_dfe[], na.rm = TRUE), na.color = "transparent")
 
@@ -365,9 +366,7 @@ leaflet(options = leafletOptions(minZoom = 8)) |>
             position = "bottomright", group = "Forest Density 50 m — Zürich") |>
   addLegend(pal = pal_green, values = c(0, 1), title = "Forest density grad. 1000 m (0–1)",
             position = "bottomright", group = "Forest Density Gradient 1000 m — Zürich") |>
-  # Hide every layer by default (placed AFTER the legends so the groupremove
-  # event also removes each hidden layer's legend on load — nothing shown until
-  # the user toggles a layer on).
+
   hideGroup(c("Forest Cover (binary) — Aargau [excluded VIF]",
               "Forest Density 50 m — Aargau",
               "Forest Density Gradient 1000 m — Aargau",
@@ -593,14 +592,12 @@ leaflet(options = leafletOptions(minZoom = 8)) |>
 ::::
 
 ::: {.content-visible unless-format="html"}
-Of the fourteen spatial covariates assembled for the resistance surface pipeline, the two maps below show its final products: the habitat suitability surface recovered from the fitted iSSF coefficients, and the resistance surface obtained from it through the Keeley transformation, for both Canton Aargau and Canton Zürich.
+The two maps below show the final products of the Resistance Surface Pipeline: the habitat suitability surface recovered from the fitted iSSF coefficients, and the resistance surface obtained from it through the Keeley transformation, for both Canton Aargau and Canton Zürich.
 
 ```{r}
 #| label: fig-suitability
 #| echo: false
 #| fig-cap: "Final habitat suitability and resistance surfaces for Canton Aargau. Left: habitat suitability (0 to 1), with high values indicating landscape preferred during transit movement. Right: resistance under the Keeley transformation with C = 4, where low values are permeable and high values approach impassable."
-# Copy into the project-local images/ folder so the typst compiler can read it
-# (typst refuses to load files outside its project root, i.e. outside docs/).
 local_png <- file.path("images", "suitability_resistance_maps_Aargau.png")
 invisible(file.copy(file.path(data_proc, "suitability_resistance_maps_Aargau.png"), local_png, overwrite = TRUE))
 knitr::include_graphics(local_png)
@@ -610,8 +607,6 @@ knitr::include_graphics(local_png)
 #| label: fig-suitability-zurich
 #| echo: false
 #| fig-cap: "Final habitat suitability and resistance surfaces for Canton Zürich, produced by transferring the Aargau-fitted iSSF coefficients onto the Zürich landscape. Left: habitat suitability (0 to 1). Right: resistance under the Keeley transformation with C = 4."
-# Copy into the project-local images/ folder so the typst compiler can read it
-# (typst refuses to load files outside its project root, i.e. outside docs/).
 local_png <- file.path("images", "suitability_resistance_maps_Zurich.png")
 invisible(file.copy(file.path(data_proc, "suitability_resistance_maps_Zurich.png"), local_png, overwrite = TRUE))
 knitr::include_graphics(local_png)
@@ -620,7 +615,7 @@ knitr::include_graphics(local_png)
 
 ## QGIS Plugin
 
-The *Wildboar Connectivity (ASF)* plugin was implemented as a QGIS 3.40 extension and tested against the Zürich resistance raster with the WILMA core habitat polygons as LCP destination targets. Functional testing confirmed that all five analytical modules produced spatially coherent outputs for a range of outbreak origin locations across the canton. Two scenarios are reported here: a baseline analysis at an unmodified outbreak location in a forested area, and a scenario comparison demonstrating the effect of drawing a virtual fence across a corridor identified by the pinchpoint analysis.
+The *Wildboar Connectivity (ASF)* plugin was implemented as a QGIS 3.40 extension and tested against the Zürich resistance raster with the WILMA core habitat polygons as LCP destination targets. Functional testing confirmed that all five analytical modules produced spatially coherent outputs for a range of outbreak origin locations across the canton. Three scenarios are reported here: a baseline analysis at an unmodified outbreak location in a forested area, a direct comparison of the five connectivity outputs and a scenario comparison demonstrating the effect of drawing a virtual fence and a wildlife corridor.
 
 ### Baseline Connectivity Analysis
 
@@ -634,7 +629,11 @@ The continuous infection-risk raster produced three discrete EFSA-aligned zones 
 
 The BCRW density and iSSF-IBMM contamination probability layers broadly corroborated the LCP and pinchpoint structure. The BCRW density surface showed the highest visitation counts along the same corridors identified by the Circuitscape analysis, confirming their role as preferred transit routes. The iSSF-IBMM log10-transformed contamination probability surface showed the steepest probability gradients at the forest-to-infrastructure transitions where resistance increases rapidly.
 
-![Baseline scenario produced by the Wildboar Connectivity (ASF) plugin for a single hypothetical outbreak origin (red point) in Canton Zürich, run without any fences or overpasses applied. Top left: Outbreak origin shown on the Swissimage basemap. Top right: Least-cost path corridors connecting the origin to the habitat destinations (green points), classed by cumulative edge strength into near-origin backbone, intermediate, and distant segments. Centre left: Infection-risk surface classified into the three EFSA-anchored zones (low, medium, high risk). Centre right: Circuit-theory dispersal corridor probability on a Magma colour ramp, concentrating current density into a small number of bright branches that mark the structurally most important crossings around the origin. Bottom left: Biased correlated random walk visitation density for n = 2,000 realisations, forming a compact, well-defined core directly around the origin that fades toward the edge of the analysis window. Bottom right: iSSF-IBMM contamination probability surface (log10-transformed) for n = 2,000 agents, showing a high-probability zone centred on the origin surrounded by a broader, lower-probability halo across the wider landscape.](images/baseline.png){#fig-plugin-baseline width="78%"}
+![Baseline connectivity outputs for a hypothetical ASF outbreak origin (red point) in Canton Zürich, without any landscape modifications. Top left: outbreak origin on OSM basemap. Top right: LCP corridors classed by cumulative edge strength. Centre left: infection-risk raster with EFSA zones (low, medium, high). Centre right: circuit-theory pinchpoint raster (Magma ramp). Bottom left: BCRW visitation density (n = 2,000). Bottom right: iSSF-IBMM contamination probability log10(p) (n = 2,000 agents).](images/baseline.png){#fig-plugin-baseline width="100%"}
+
+In the following scenario the hypothetical outbreak origin was placed in a forested cell near Zürich city. The LCP corridors and IBMM probability follow the expected pattern along low-resistance forested ridgelines. However, the circuit-theory and BCRW outputs show artefacts in the urban matrix: current density and visitation counts accumulate in city areas where wild boar movement is ecologically implausible, a consequence of the finite rather than absolute resistance assigned to dense settlement cells. Similarly, the infection-risk surface extends high-risk zones into the urban core of Zürich, which overstates the realistic exposure probability in heavily built-up terrain. Both effects are acknowledged limitations of the specific connectivity models and are discussed in more detail in the discussion section.
+
+![Five connectivity outputs for a hypothetical ASF outbreak origin (red point) near Zürich City. Top left: basemap with origin. Top right: LCP corridors classed by cumulative edge strength. Centre left: infection-risk raster with EFSA zones (low, medium, high). Centre right: circuit-theory pinchpoint raster (Magma ramp). Bottom left: BCRW visitation density (n = 500). Bottom right: iSSF-IBMM contamination probability log10(p) (n = 2,000 agents).](images/züri.png){#fig-plugin-comparison}
 
 ### Scenario Comparison: Virtual Fence Intervention
 
@@ -642,6 +641,6 @@ To demonstrate the scenario comparison functionality, multiple virtual fences we
 
 The pinchpoint raster showed a clear rerouting of current density away from the blocked corridor segments. The cumulative flow that previously concentrated at the motorway crossing was redistributed to the new overpass, building an alternative corridor. The LCP backbone similarly shifted away from the blocked crossing to the new generated one, increasing connectivity to the south. The area at risk of infection shrank asymmetrically on the side of the newly erected fences and expanded across the newly constructed wildlife overpass.
 
-![Comparison of the baseline scenario (left column) with a modified scenario in which four fences and one wildlife overpass were placed on impassable barriers and existing wildlife overpasses near the outbreak origin (shown as red lines and blue points). From top to bottom, the rows show the least-cost path corridors, the circuit-theory dispersal corridor probability, the infection-risk zones, the biased correlated random walk visitation density (n = 2,000), and the iSSF-IBMM contamination probability surface (n = 2,000 agents). Adding the fences visibly reshapes every downstream output along the affected edge: the corridor network and the medium-risk zone are truncated to the south and southwest, the circuit-theory current is rerouted into a narrower channel north of the origin and its peak probability rises from 0.00409 to 0.005633, and the random walk density is compressed into a smaller permeable area with its peak visitation count rising from 291 to 333. Because the same number of walkers and agents is now confined to less of the landscape, the comparison illustrates how a single barrier placement concentrates rather than simply blocks movement, and how the overpass alone is building a new corridor that crosses the highway.](images/with_fence.png){#fig-comparison width="52%"}
+![Baseline (left) versus modified scenario (right) with four virtual fences (red lines) and one wildlife overpass (blue point). Rows show, from top to bottom: LCP corridors, circuit-theory pinchpoint raster, infection-risk zones, BCRW visitation density (n = 2,000), and iSSF-IBMM contamination probability log10(p) (n = 2,000 agents).](images/with_fence.png){#fig-comparison width="100%"}
 
-The scenario comparison illustrates the core purpose of the plugin. It enables iterative exploration of management alternatives within the same GIS session. A wildlife manager can test different fence alignments, observe how each one redirects the modelled corridor network, and compare the resulting wild boar corridors and infection-risk zones, all without leaving the QGIS environment or re-running any preprocessing steps.
+The scenario comparison illustrates a main purpose of the plugin. It enables iterative exploration of management alternatives within the same GIS session. A wildlife manager can test different fence alignments, observe how each one redirects the modelled corridor network, and compare the resulting wild boar corridors and infection-risk zones, all without leaving the QGIS environment or re-running any preprocessing steps.

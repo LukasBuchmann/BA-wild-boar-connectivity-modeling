@@ -100,10 +100,12 @@ return {
     if meta.supervisors then
       add('<div class="supervisors"><p>' .. L.supervisors_label .. '</p><ul>')
       for _, sup in ipairs(meta.supervisors) do
-        local title = sup.title and s(sup.title) or ''
-        local name  = sup.name  and s(sup.name)  or ''
-        local aff   = sup.affiliation and s(sup.affiliation) or ''
-        add('<li>' .. title .. ' ' .. name .. '<br>' .. aff .. '</li>')
+        local title  = sup.title and s(sup.title) or ''
+        local name   = sup.name  and s(sup.name)  or ''
+        local aff    = sup.affiliation and s(sup.affiliation) or ''
+        local group  = sup['research-group'] and s(sup['research-group']) or ''
+        local group_html = group ~= '' and ('<br>' .. group) or ''
+        add('<li>' .. title .. ' ' .. name .. '<br>' .. aff .. group_html .. '</li>')
       end
       add('</ul></div>')
     end

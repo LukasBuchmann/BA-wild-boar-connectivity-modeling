@@ -16,7 +16,7 @@ The connectivity models developed by @fischer2024 and @urbina2023 are methodolog
 
 This thesis develops an interactive spatial planning tool in the form of a QGIS plugin that models functional connectivity for wild boar across the Canton of Zurich. The plugin allows users to dynamically alter the underlying landscape resistance surface by placing hypothetical infrastructure elements, such as movement barriers or wildlife crossings, directly on the map. After each modification, the model recalculates the resulting connectivity and visualises the effect on potential ASF spread corridors and pinch points. The underlying methodology adapts the resistance surface construction, least-cost path calculation and circuit-theory-based corridor modeling approach of @fischer2024 and @urbina2023, with all parameters specifically tailored to the ecology and movement behaviour of wild boar.
 
-Two specific objectives guide this work. The first is the methodological adaptation of the existing connectivity modeling framework for wild boar, including the classification of wild boar telemetry data into in-matrix and in-patch movement, the fitting of an integrated Step Selection Function based on spatial covariantes and finally the construction of a species-specific resistance surface. The second is the development of an interactive QGIS plugin that allows end users to simulate ASF spread from a specific location with different connectivity models and structural landscape changes without requiring programming knowledge.
+Two specific objectives guide this work. The first is the methodological adaptation of the existing connectivity modeling framework for wild boar, including the classification of wild boar telemetry data into in-matrix and in-patch movement, the fitting of an integrated Step Selection Function based on spatial covariates and finally the construction of a species-specific resistance surface. The second is the development of an interactive QGIS plugin that allows end users to simulate ASF spread from a specific location with different connectivity models and structural landscape changes without requiring programming knowledge.
 
 ## AI declaration
 
@@ -32,6 +32,4 @@ the original work of the author.
 
 • Document Formatting: AI assistance was employed to troubleshoot and optimize the syntax for typesetting systems (e.g., Quarto) used in compiling the final scientific report.
 
-The verification of the accuracy and relevance of the AI-generated outputs, as well as the
-responsibility for the final content, lies solely with the author. A detailed list of the specific
-tools used is provided in the Appendix.
+The verification of the accuracy and relevance of the AI-generated outputs, as well as the responsibility for the final content, lies solely with the author. A detailed list of the specific tools used is provided in the Appendix.

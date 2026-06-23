@@ -1,6 +1,6 @@
 # Results
 
-Two primary deliverables were created during this project: a 25-metre resolution wild boar resistance surface covering Canton Aargau (used for model calibration) and Canton Zürich (produced by parameter transfer), and the *Wildboar Connectivity (ASF)* QGIS plugin that uses this resistance surface as its analytical input. The following sections present the results of this two steps.
+Two primary deliverables were created during this project: a 25-metre resolution wild boar resistance surface covering Canton Aargau (used for model calibration) and Canton Zürich (produced by parameter transfer), and the *Wildboar Connectivity (ASF)* QGIS plugin that uses this resistance surface as its analytical input. The following sections present the results of these two steps.
 
 ```{r}
 #| label: setup
@@ -621,7 +621,7 @@ The *Wildboar Connectivity (ASF)* plugin was implemented as a QGIS 3.40 extensio
 
 For the baseline demonstration, the outbreak origin was placed in a forested grid cell north of the Winterthur city centre representative of a scenario in which the disease enters through a wild boar population in that region and disperses in different directions. All five outputs were enabled, with 2,000 BCRW realisations and 2,000 iSSF-IBMM agents. The analysis completed in under three minutes on a standard laptop.
 
-The LCP corridor analysis connected the outbreak origin to the nearest reachable WILMA habitat clusters via the pre-computed Dijkstra cost grid. The graduated blue styling assigned light sky blue to distant corridors serving high cummulative resistance cost, vivid blue to intermediate connectors, and deep navy to the backbone segments shared by multiple routes and smaller cummulative resistance cost. The paths concentrated in the forested ridgelines and crossed the wildlife overpasses, consistent with the visual pattern of low-resistance cells in the Zürich resistance map.
+The LCP corridor analysis connected the outbreak origin to the nearest reachable WILMA habitat clusters via the pre-computed Dijkstra cost grid. The graduated blue styling assigned light sky blue to distant corridors serving high cumulative resistance cost, vivid blue to intermediate connectors, and deep navy to the backbone segments shared by multiple routes and smaller cumulative resistance cost. The paths concentrated in the forested ridgelines and crossed the wildlife overpasses, consistent with the visual pattern of low-resistance cells in the Zürich resistance map.
 
 The circuit-theory pinchpoint raster, computed using Circuitscape.jl via Julia subprocess, showed concentrated current density at the defined outbreak point and at several bottlenecks. These bottlenecks included, wildlife crossings, but also narrow forest corridors that are separated from one another by roads or railway tracks between habitat patches. These pinchpoints represent the locations where a fence intervention would produce the largest reduction in connectivity at lowest material cost.
 

@@ -16,12 +16,12 @@ about=Decision-support tool for hunting administrations preparing for African
     map. Fences and wildlife overpasses can be drawn interactively; hitting Run
     again immediately shows the modified result.
 
-tracker=https://github.com/
-repository=https://github.com/
+tracker=
+repository=
 
 hasProcessingProvider=no
 tags=connectivity, ASF, african swine fever, wild boar, wildlife, least cost path, circuitscape, pinchpoint, fence, overpass, iSSF, IBMM
-homepage=https://github.com/
+homepage=
 category=Plugins
 icon=icon.png
 experimental=True

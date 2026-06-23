@@ -16,14 +16,6 @@ The resistance surface is the core spatial input to all functional connectivity 
 
 Where GPS data are available, the integrated step-selection function (iSSF) provides a principled basis for the empirical approach [@avgar2016]. The iSSF reconstructs movement as a sequence of steps, each with a step length and turning angle, and compares every observed step against random alternatives drawn from the same movement kernel. Fitting a conditional logistic regression of the form $w(\mathbf{x}) = \exp\left(\sum_k \hat{\beta}_k x_k\right)$, where $w(\mathbf{x})$ is the relative selection strength of a step ending at covariate values $x_k$ and $\hat{\beta}_k$ is the estimated selection coefficient for covariate $k$, yields coefficients that express habitat preference while holding movement capacity and availability constant. This separates genuine preference from mere abundance: an animal seen often in forest may prefer forest, or forest may simply be plentiful where it started, and the conditional design distinguishes the two. The fitted linear predictor is rescaled into a habitat suitability $S \in [0, 1]$, which @keeley2016 proposed to convert into resistance through the negative exponential transformation $R = \exp\left(c \cdot (1 - S)\right)$, where $c$ is a positive constant that controls how sharply resistance increases as suitability declines. A single tracking dataset therefore yields a resistance surface that is both species-specific and statistically grounded.
 
-::: {.content-visible when-format="html"}
-This text and any content here appears only in the HTML output.
-:::
-
-::: {.content-visible when-format="pdf"}
-This text and any content here appears only in the PDF output.
-:::
-
 ```{r}
 #| label: fig-issf-schematic
 #| echo: false

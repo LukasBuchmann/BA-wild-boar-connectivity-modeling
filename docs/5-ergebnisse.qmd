@@ -111,7 +111,7 @@ rule_df <- data.frame(
     "*All remaining steps (conservative default)*"
   ),
   `Steps (n)` = c("4759", "2748", "317", "**7824**", "*125285*"),
-  `Share of in-matrix (%)` = c("60.8", "35.1", "4.1", "**100.0**", "*—*"),
+  `In-matrix (%)` = c("60.8", "35.1", "4.1", "**100.0**", "*—*"),
   check.names = FALSE
 )
 

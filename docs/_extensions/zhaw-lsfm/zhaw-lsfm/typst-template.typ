@@ -21,6 +21,7 @@
   confidential: false,
   thesis-type: none,
   degree-type: none,
+  specialization: none,
   study-year: none,
   submission-date: none,
   study-direction: none,
@@ -142,6 +143,9 @@
           #if degree-type != none and study-year != none [
             \ #degree-type #study-year
           ]
+          #if specialization != none [
+            \ #specialization
+          ]
           #if submission-date != none [
             \ #if lang == "en" [
               Submission date #submission-date
@@ -150,7 +154,7 @@
             ]
           ]
           #if study-direction != none [
-            \ Studienrichtung #study-direction
+            \ Specialization #study-direction
           ]
         ]
       }

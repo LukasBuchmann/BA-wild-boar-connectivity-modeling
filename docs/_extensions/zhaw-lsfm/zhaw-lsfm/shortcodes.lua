@@ -52,7 +52,7 @@ return {
       L.department          = "Departement Life Sciences and Facility Management"
       L.author_by           = "by"
       L.date_prefix         = "Submission date"
-      L.direction_prefix    = "Study direction"
+      L.direction_prefix    = "Specialization"
       L.supervisors_label   = "Supervisors:"
       L.confidential_label  = "Confidential"
       L.imprint_title       = "Imprint"
@@ -93,8 +93,8 @@ return {
     if meta['submission-date'] then
       add('<p class="submission-date">' .. L.date_prefix .. ' ' .. s(meta['submission-date']) .. '</p>')
     end
-    if meta['study-direction'] then
-      add('<p class="study-direction">' .. L.direction_prefix .. ' ' .. s(meta['study-direction']) .. '</p>')
+    if meta['specialization'] then
+      add('<p class="specialization">' .. L.direction_prefix .. ' ' .. s(meta['specialization']) .. '</p>')
     end
 
     if meta.supervisors then

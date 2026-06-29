@@ -31,6 +31,8 @@ contributes:
       echo: false
       toc: true
       number-sections: true
+      number-depth: 2
+      section-numbering: "1.1."
       execute:
         warning: false
         error: true

@@ -4,7 +4,7 @@ This thesis follows the FAIR principles for data and code management specified i
 
 ## Code and Workflow
 
-The analytical workflow is split across two components. The resistance surface pipeline, from raw telemetry to the final 25-metre resistance raster, is contained in the single Quarto notebook `scripts/01_create_resistance_surface.ipynb`. Given the same input data and software environment, this notebook produces identical outputs deterministically. All connectivity analyses, including the infection-risk kernel, the biased correlated random walk, and the iSSF-based individual movement model, are implemented directly in the QGIS plugin *Wildboar Connectivity (ASF)*. The plugin is distributed as a standard QGIS Python package with a `metadata.txt` manifest and can be installed through the QGIS plugin manager.
+The analytical workflow is split across two components. The resistance surface pipeline, from raw telemetry to the final 25-metre resistance raster, is contained in the single Jupyter notebook `scripts/01_create_resistance_surface.ipynb`. Given the same input data and software environment, this notebook produces identical outputs deterministically. All connectivity analyses, including the infection-risk kernel, the biased correlated random walk, and the iSSF-based individual movement model, are implemented directly in the QGIS plugin *Wildboar Connectivity (ASF)*. The plugin is distributed as a standard QGIS Python package with a `metadata.txt` manifest and can be installed through the QGIS plugin manager.
 
 ## Software Environment
 

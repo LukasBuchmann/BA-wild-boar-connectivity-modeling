@@ -100,6 +100,7 @@ The three-rule hierarchical classifier partitioned these steps into 7,824 (5.9%)
 ```{r}
 #| label: tbl-classification
 #| tbl-cap: "Step classification counts for the in-matrix telemetry dataset. Rules are applied hierarchically in the order shown. A step is classified as in-matrix if it meets any rule that has not been met by a prior rule."
+#| tbl-colwidths: [20, 45, 17, 18]
 
 rule_df <- data.frame(
   Rule = c("Rule 1", "Rule 2", "Rule 3", "**In-matrix**", "*In-patch*"),
@@ -196,7 +197,7 @@ Fourteen spatial covariates were assembled on the 25-metre Aargau grid before VI
 
 Seven statistically significant covariates were retained for the iSSF Fitting. They are all positive and their confidence intervals exclude zero. Forest density at the 50-metre scale and distance to railway show the highest beta coefficients with similar point estimates, but the railway coefficient carries a markedly wider interval. Distance to water shows the weakest effect, though it remains statistically significant.
 
-![iSSF selection coefficients (β) with 95% confidence intervals for the seven retained covariates, ordered by effect size. All estimates are positive and exclude zero. The dashed line marks β = 0.](images/issf_coefficients-2.png){#fig-issf-coefficients}
+![iSSF selection coefficients (β) with 95% confidence intervals for the seven retained covariates, ordered by effect size. All estimates are positive and exclude zero. The dashed line marks β = 0.](images/issf_coefficients.png){#fig-issf-coefficients}
 
 :::: {.content-visible when-format="html"}
 ## Interactive Raster Viewer
@@ -630,6 +631,8 @@ The continuous infection-risk raster produced three discrete EFSA-aligned zones 
 The BCRW density and iSSF-IBMM contamination probability layers broadly corroborated the LCP and pinchpoint structure. The BCRW density surface showed the highest visitation counts along the same corridors identified by the Circuitscape analysis, confirming their role as preferred transit routes. The iSSF-IBMM log10-transformed contamination probability surface showed the steepest probability gradients at the forest-to-infrastructure transitions where resistance increases rapidly.
 
 ![Baseline connectivity outputs for a hypothetical ASF outbreak origin (red point) in Canton Zürich, without any landscape modifications. Top left: outbreak origin on OSM basemap. Top right: LCP corridors classed by cumulative edge strength. Centre left: infection-risk raster with EFSA zones (low, medium, high). Centre right: circuit-theory pinchpoint raster (Magma ramp). Bottom left: BCRW visitation density (n = 2,000). Bottom right: iSSF-IBMM contamination probability log10(p) (n = 2,000 agents).](images/baseline.png){#fig-plugin-baseline width="100%"}
+
+### Comparison of the five connectivity outputs
 
 In the following scenario the hypothetical outbreak origin was placed in a forested cell near Zürich city. The LCP corridors and IBMM probability follow the expected pattern along low-resistance forested ridgelines. However, the circuit-theory and BCRW outputs show artefacts in the urban matrix: current density and visitation counts accumulate in city areas where wild boar movement is ecologically implausible, a consequence of the finite rather than absolute resistance assigned to dense settlement cells. Similarly, the infection-risk surface extends high-risk zones into the urban core of Zürich, which overstates the realistic exposure probability in heavily built-up terrain. Both effects are acknowledged limitations of the specific connectivity models and are discussed in more detail in the discussion section.
 

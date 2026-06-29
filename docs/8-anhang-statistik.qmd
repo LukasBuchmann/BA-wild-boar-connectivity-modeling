@@ -1,4 +1,4 @@
-# Statistical Outputs and Model Parameters
+# Statistical Outputs and Model Parameters {#sec-stat}
 
 This appendix collects the full statistical output of the integrated step-selection function and the parameter settings of the five plugin analysis modules, so that the results in the main text can be reproduced and audited.
 

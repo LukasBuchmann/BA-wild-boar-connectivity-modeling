@@ -242,3 +242,7 @@ data/
 *.rar
 /.quarto/
 **/*.quarto_ipynb
+
+# Quarto rendered HTML (self-contained files can exceed 100 MB)
+docs/presentation/*.html
+docs/_site/

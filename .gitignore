@@ -244,5 +244,12 @@ data/
 **/*.quarto_ipynb
 
 # Quarto rendered HTML (self-contained files can exceed 100 MB)
-docs/presentation/*.html
+docs/presentation/01_06_26.html
+docs/presentation/19_05_26.html
+docs/presentation/27_04_26.html
 docs/_site/
+
+# Quarto presentation asset folders
+docs/presentation/01_06_26_files/
+docs/presentation/19_05_26_files/
+docs/presentation/27_04_26_files/

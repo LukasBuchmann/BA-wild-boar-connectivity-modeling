@@ -8,10 +8,10 @@ email=buchmluk@students.zhaw.ch
 
 about=Decision-support tool for hunting administrations preparing for African
     Swine Fever (ASF). Load a Keeley-transformed iSSF resistance raster, click
-    one point as the outbreak origin, and the plugin computes: (a) an
-    infection-risk raster (resistant kernel, green/yellow/red), (b) least-cost
-    path corridors to the nearest low-resistance clusters, (c) a
-    Circuitscape/Circuit-theory pinchpoint raster, (d) an optional BCRW random-
+    one point as the outbreak origin, and the plugin computes: (a) least-cost
+    path corridors to the nearest low-resistance clusters, (b) a
+    Circuitscape/Circuit-theory pinchpoint raster, (c) an
+    infection-risk raster (resistant kernel, green/yellow/red), (d) an optional BCRW random-
     walk density, and (e) an optional iSSF-IBMM agent contamination-probability
     map. Fences and wildlife overpasses can be drawn interactively; hitting Run
     again immediately shows the modified result.

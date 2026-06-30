@@ -62,18 +62,10 @@ LOG_TAG = "wildboar-asf"
 # typical-resistance terrain.
 #
 # D = 4 km, the consensus mean natal dispersal distance for European
-# wild boar across the published telemetry / mark-recapture record:
-#
-#   Truve and Lemel (2003)  Wildlife Biology  9(4): 51 to 57.
-#   Keuling et al. (2010)   Eur J Wildl Res  56(2): 159 to 167.
-#   Prevot and Licoppe (2013) Eur J Wildl Res 59(6): 795 to 803.
-#   Morelle, Lehaire, Lejeune (2015) Mammal Review 45: 15 to 29.
+# wild boar across the published telemetry / mark-recapture record.
 #
 # The resulting risk bands map to the EFSA operational zones (2018
-# Scientific Opinion on ASF in wild boar):
-#   risk > 0.50 (within ~2.8 km)  -> EFSA protection zone (3 km).
-#   risk 0.15 to 0.50 (~2.8 to ~7.6 km) -> EFSA surveillance zone (10 km).
-#   risk <= 0.15  (> ~7.6 km)     -> outside the surveillance zone.
+# Scientific Opinion on ASF in wild boar).
 # ---------------------------------------------------------------------
 ASF_DISPERSAL_KM = 4.0
 
@@ -117,9 +109,8 @@ def simulate_ibmm(
 
     rows, cols = hab_suitability.shape
     cellsize_m  = float(abs(win_tf.a))
-    # The gamma step-length kernel is fitted in metres (see the iSSF
-    # notebook); convert its scale to pixels once so every draw below can
-    # stay in raster (row, col) space.
+    # The gamma step-length kernel is fitted in metres; convert its scale 
+    # to pixels once so every draw below can stay in raster (row, col) space.
     sl_scale_px = IBMM_SL_GAMMA_SCALE_M / cellsize_m
 
     # Suitability doubles as the step-selection weight surface: agents are
@@ -579,16 +570,15 @@ class AsfConnectivityTask(QgsTask):
         return labeled
 
     # -----------------------------------------------------------------
-    # LCPs to the NEAREST low-resistance clusters, weighted by cluster
-    # size.
+    # LCPs to the NEAREST low-resistance clusters, weighted by
+    # cumulative cost distance.
     #
     # Method:
     #   1. Threshold the in-AOI valid cells at the 20th percentile to
     #      isolate "low-resistance" pixels (good boar habitat).
     #   2. Find connected components (scipy.ndimage.label, 8-connected).
-    #      Cluster SIZE (cell count) is its strength / importance:
-    #      more habitat there means more boars potentially dispersing
-    #      to and from it.
+    #      Cluster SIZE (cell count) is recorded only to identify the
+    #      anchor cell and for the destination visualisation layer.
     #   3. Skip the cluster(s) overlapping the origin disc.
     #   4. For each remaining cluster, pick the cell with the LOWEST
     #      Dijkstra cost from the origin as the anchor (the natural
@@ -597,12 +587,12 @@ class AsfConnectivityTask(QgsTask):
     #   5. Sort by cost ASCENDING (nearest in boar-cost terms first),
     #      cap at n_max_targets (default 100).
     #   6. Traceback each anchor through the MCP.
-    #   7. Edge strength: each LCP carries its destination cluster's
-    #      SIZE. For every edge along the path, ADD that size to the
-    #      edge's cumulative strength. Where multiple LCPs share a
-    #      segment, the segment's strength is the SUM of every
-    #      destination it serves - the shared backbone matters more
-    #      because more habitat depends on it.
+    #   7. Edge strength: each edge receives max_cost - local_cost,
+    #      where local_cost is the average Dijkstra cost of its two
+    #      endpoints. Segments near the origin (low cost) are therefore
+    #      strong; segments far away decay naturally. Where multiple
+    #      LCPs share an edge, their strengths accumulate, reinforcing
+    #      the shared backbone corridor.
     #   8. Merge consecutive edges with the same cumulative strength
     #      into single line features.
     # -----------------------------------------------------------------
@@ -797,8 +787,7 @@ class AsfConnectivityTask(QgsTask):
 
         The decay scale D_cost is the cost of traversing ASF_DISPERSAL_KM
         through typical-resistance terrain. This pins the kernel to the
-        published mean wild boar dispersal distance (4 km, see citations
-        at the top of this module) instead of letting the AOI size
+        published mean wild boar dispersal distance instead of letting the AOI size
         stretch the bands outward.
         """
         cellsize_m = float(abs(win_tf.a))
@@ -1021,22 +1010,11 @@ class AsfConnectivityTask(QgsTask):
     #         straight-line motion. We use kappa = 2 (moderate
     #         persistence; turning-angle SD ~ 50 deg), consistent
     #         with the cos_ta coefficient from the in-matrix iSSF
-    #         in Step 5 of the resistance-surface notebook.
-    #
-    # References:
-    #     Codling, E. A., Plank, M. J., Benhamou, S. (2008).
-    #         Random walk models in biology. Journal of the Royal
-    #         Society Interface 5(25): 813-834.
-    #     Turchin, P. (1998). Quantitative Analysis of Movement.
-    #         Sinauer.
-    #     Avgar, T., Potts, J. R., Lewis, M. A., Boyce, M. S.
-    #         (2016). Integrated step selection analysis. Methods
-    #         in Ecology and Evolution 7(5): 619-630.
+    #         in the resistance-surface notebook.
     #
     # The output raster is the cell-visit count over n_walks walks.
     # In the limit n_walks -> infinity it converges to the same
-    # surface as the Circuit-theory current map (Saerens et al.
-    # 2009, RSP framework), which is a useful sanity check.
+    # surface as the Circuit-theory current map, which is a useful sanity check.
     # -----------------------------------------------------------------
     def _random_walks(self, arr, win_tf, crs, source_cells,
                       n_walks=500, max_steps=2000, kappa=2.0):
@@ -1152,7 +1130,7 @@ class AsfConnectivityTask(QgsTask):
           - Starts at a random cell in the outbreak zone.
           - Lives for a stochastic number of active steps sampled from
             Gamma(ASF_IP_GAMMA_SHAPE, ASF_IP_GAMMA_SCALE_DAYS) × steps/day,
-            representing the time from infection to death (EFSA 2018).
+            representing the time from infection to death.
           - At each step selects the next cell from IBMM_N_CANDIDATES
             candidates with probability proportional to the habitat
             suitability at each candidate's endpoint (the iSSF selection

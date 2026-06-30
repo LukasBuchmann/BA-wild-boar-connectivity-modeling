@@ -2,7 +2,7 @@
 """
 Subprocess wrapper around the official Circuitscape.jl (Julia).
 
-Used as the primary pinchpoint solver. Falls back to our scipy.sparse
+Used as the primary pinchpoint solver. Falls back to the scipy.sparse
 implementation in connectivity_task._single_source_current_scipy()
 if Julia or Circuitscape.jl is not available, or if the subprocess
 fails.
@@ -11,7 +11,7 @@ Setup the user needs (one-time):
     1. Install Julia from https://julialang.org (>=1.6)
     2. In a Julia REPL:  using Pkg; Pkg.add("Circuitscape")
 
-We invoke Julia via subprocess and pass it an INI file. Inputs and
+Invoke Julia via subprocess and pass it an INI file. Inputs and
 outputs are ESRI ASCII grids written in a tempdir that is cleaned up
 afterwards.
 """

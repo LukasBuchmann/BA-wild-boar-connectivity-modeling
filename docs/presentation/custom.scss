@@ -1,0 +1,49 @@
+/*-- custom.scss (shared across all presentations) --*/
+
+/* Slightly tighten default spacing */
+.reveal .slides section {
+  font-size: 0.95em;
+}
+
+/* Cleaner list spacing */
+.reveal ul, .reveal ol {
+  margin-left: 1.2em;
+}
+
+.reveal ul li, .reveal ol li {
+  margin-bottom: 0.35em;
+  line-height: 1.45;
+}
+
+/* Tone down the footer */
+.reveal .footer {
+  font-size: 0.55em;
+  opacity: 0.6;
+}
+
+/* Callout adjustments */
+.reveal .callout {
+  margin-top: 0.8em;
+  font-size: 0.88em;
+}
+
+/* Section title slides */
+.reveal h1 {
+  font-size: 1.8em;
+  font-weight: 600;
+}
+
+/* Slide headings */
+.reveal h2 {
+  font-size: 1.3em;
+  font-weight: 600;
+  border-bottom: 1px solid #ddd;
+  padding-bottom: 0.2em;
+  margin-bottom: 0.6em;
+}
+
+/* Images: never overflow */
+.reveal img {
+  max-height: 68vh;
+  width: auto;
+}

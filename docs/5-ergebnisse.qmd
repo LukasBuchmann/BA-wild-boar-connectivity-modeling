@@ -640,7 +640,7 @@ In the following scenario the hypothetical outbreak origin was placed in a fores
 
 ### Scenario Comparison: Virtual Fence Intervention
 
-To demonstrate the scenario comparison functionality, multiple virtual fences were drawn over the wildlife overpasses and a new wildlife overpass was built in the north of winterthur crossing a highway. The fence was rasterized as a two-cell-wide NaN wall in the modified resistance array and the full analysis was rerun without changing the outbreak origin or any other parameter. Both runs used identical settings so that all differences in the output layers can be attributed entirely to the fence modification.
+To demonstrate the scenario comparison functionality, multiple virtual fences were drawn over the wildlife overpasses and a new wildlife overpass was built in the north of Winterthur crossing a highway. The fence was rasterized as a two-cell-wide NaN wall in the modified resistance array and the full analysis was rerun without changing the outbreak origin or any other parameter. Both runs used identical settings so that all differences in the output layers can be attributed entirely to the fence modification.
 
 The pinchpoint raster showed a clear rerouting of current density away from the blocked corridor segments. The cumulative flow that previously concentrated at the motorway crossing was redistributed to the new overpass, building an alternative corridor. The LCP backbone similarly shifted away from the blocked crossing to the new generated one, increasing connectivity to the south. The area at risk of infection shrank asymmetrically on the side of the newly erected fences and expanded across the newly constructed wildlife overpass.
 

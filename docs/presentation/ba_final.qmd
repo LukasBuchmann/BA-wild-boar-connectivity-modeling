@@ -1,8 +1,9 @@
 ---
-title: "An Interactive Planning Tool for Wild Boar Connectivity and African Swine Fever Prevention"
+title: "Interactive Planning Tool for Wild Boar Connectivity"
 subtitle: "Bachelor Thesis · Applied Digital Life Science · ZHAW"
 author: "Lukas Buchmann"
-date: 9 July 2026
+date: "2026-07-09"
+date-format: "DD.MM.YYYY"
 format:
   revealjs:
     theme: default
@@ -19,6 +20,7 @@ title-slide-attributes:
   data-background-image: ../cover.png
   data-background-size: cover
   data-background-opacity: "0.3"
+  data-background-color: "#000"
 execute:
   echo: false
   eval: false
@@ -47,7 +49,11 @@ execute:
 :::
 
 ::: {.column width="50%"}
-![](images/connectivity.png)
+![](../images/efs27290-fig-0006-m.jpg){width="75%"}
+
+::: {style="font-size:0.55em; color:#888; text-align:center; margin-top:0.2em"}
+Source: EFSA (2022) — Epidemiological analyses of African swine fever in the European Union
+:::
 :::
 :::::
 
@@ -77,7 +83,7 @@ In this bachelor thesis i only focussed on the **connectivity of wild boar** and
 
 ## What is missing
 
-Existing Swiss connectivity models — Fischer (2024), Urbina (2023) — are **static**.
+Existing connectivity models are **static**.
 
 They answer: *where are the corridors?*
 
@@ -120,11 +126,15 @@ The Plugin, then **takes this resistance surface** and lets the user run five di
 - **Calibration:** Canton Aargau — GPS telemetry available
 - **Transfer:** Canton Zürich — independent application area
 - 25 m resolution · Swiss LV95
-- Landscape: Swiss Mittelland — motorways, rail, agriculture interrupting forested ridges
+- Landscape: Swiss Plateau — forested areas cut by motorways, rail, agriculture and settlements
 :::
 
 ::: {.column width="45%"}
 ![](../images/aargau_study_area.png)
+
+::: {style="font-size:0.55em; color:#888; text-align:center; margin-top:0.2em"}
+Study area extent — Canton Aargau with 1 km buffer, clipped at national border
+:::
 :::
 :::::
 
@@ -144,7 +154,9 @@ The processing extent was **clipped at the national border** because the high-re
 
 ## Resistance Surface Pipeline
 
-![](../images/pipeline.svg)
+::: {style="text-align:center"}
+![](../images/pipeline.svg){fig-align="center" width="60%"}
+:::
 
 ::: {.notes}
 Here you can see the **Processdiagram** of the Resistance Surface Pipeline.
@@ -165,7 +177,7 @@ Those coefficients feed into the resistance surface through the **Keeley exponen
 ## Step classification
 
 | Rule | Criterion | Steps | Share |
-|------|-----------|------:|------:|
+|------|----------------------------------------------------------------|------:|------:|
 | 1 | Length > 250 m | 4,759 | 60.8 % |
 | 2 | Length > 150 m **and** \|angle\| < π/4 | 2,748 | 35.1 % |
 | 3 | ≥ 3 consecutive: length > 100 m **and** \|angle\| < π/4 | 317 | 4.1 % |
@@ -191,33 +203,23 @@ The result is that **94 percent** of steps are in-patch, which makes biological 
 
 ---
 
-## iSSF — 7 covariates retained
+## iSSF results
 
 ::::: columns
-::: {.column width="50%"}
-::: {style="font-size:0.82em"}
-14 candidates → **7 retained** (all VIF < 1.5)
+::: {.column width="55%"}
+![](../images/issf_coefficients.png)
 
-**Kept:**
-
-- forest density 50 m
-- forest density 1000 m
-- distance to water
-- distance to main roads
-- distance to secondary roads
-- distance to railways
-- distance to settlements
+::: {style="font-size:0.55em; color:#888; text-align:center; margin-top:0.2em"}
+iSSF coefficients with 95% confidence intervals — 7 retained covariates
 :::
 :::
 
-::: {.column width="50%"}
-::: {.callout-important}
-**Fenced road exclusion**
-
-Initial β = −0.60 → apparent attraction to motorways.
-
-Cause: animals *pacing along* fenced motorways, not crossing them. This is a data artefact, not true preference. Fenced roads belong in the burn-in, not the regression.
-:::
+::: {.column width="45%"}
+- All 7 coefficients **positive**
+- Positive = preferred during transit
+- Forest density 50 m: tightest CI — most reliably estimated
+- Railway: strong avoidance, wide CI (sparse in Aargau)
+- Biologically realistic
 :::
 :::::
 
@@ -226,33 +228,7 @@ An iSSF (**integrated step-selection function**) is a **statistical model** that
 
 I started with **14 candidate covariates** from the swissTLM3D dataset and the DHM25 elevation model. After a VIF (Variance Inflation Factor) check to flag collinearity, seven survived with all VIFs below 1.5.
 
-The most interesting exclusion is **distance to fenced roads**. In the initial exploratory model, the **coefficient** came back **negative** — apparently indicating that **wild boar are attracted to motorways**. 
-
-That is ecologically implausible. 
-
-What is actually happening is that an animal that cannot cross a fenced motorway **walks along the fence** for an extended distance, creating a **systematic spatial association** between the animal and the motorway in the data. **The iSSF picks this up as apparent attraction**. The correct treatment is to place fenced roads in the burn-in part as absolute barriers and leave them out of the regression.
-:::
-
----
-
-## iSSF results
-
-::::: columns
-::: {.column width="55%"}
-![](../images/issf_coefficients.png)
-:::
-
-::: {.column width="45%"}
-- All 7 coefficients **positive**
-- Positive = preferred during transit
-- Forest density 50 m: tightest CI — most reliably estimated
-- Railway: strong avoidance, wide CI (sparse in Aargau)
-- Movement kernel terms both highly significant
-:::
-:::::
-
-::: {.notes}
-All seven retained covariates were **positive predictors** of transit movement, confirming that **wild boar prefer** denser forest cover and greater distance from roads, railways, and settlements during directed travel. This pattern is **biologically realistic and consistent** with the established movement ecology of the species.
+All these covariates were **positive predictors** of transit movement, confirming that **wild boar prefer** denser forest cover and greater distance from roads, railways, and settlements during directed travel. This pattern is **biologically realistic and consistent** with the established movement ecology of the species.
 
 The forest density at the 50 metre scale has the **highest beta coefficient** and **smallest standard error**. Which means its the **most reliably estimated effect**: immediate cover is the dominant driver of where a wild boar chooses to transit through the landscape.
 
@@ -267,18 +243,16 @@ The **two movement kernel** terms were **both significant**, confirming that hab
 
 ![](../images/suitability_resistance_maps_Aargau.png){width=100%}
 
-::: {style="font-size:0.75em; color:#555"}
-Range: 1–54.6 | NoData = absolute barriers
+::: {style="font-size:0.55em; color:#888; text-align:center; margin-top:0.1em"}
+Habitat suitability (left) and resistance surface (right) for Canton Aargau · R range: 1–54.6 · white = absolute barrier (NoData)
 :::
 
 ::: {.notes}
 This is the **final Habitat Suitability and Resistance Surface** for the Canton Aargau.
 
-They **reproduce the expected landscape structure**. **Forested ridges** appear as low-resistance green corridors. The **agricultural plain and urban areas push** resistance up toward the maximum. **Motorways and large lakes** appear as grey NoData — absolute barriers.
+They **reproduce the expected landscape structure**. **Forested ridges** appear as low-resistance green corridors. The **agricultural plain and urban areas push** resistance up toward the maximum. 
 
-The **median resistance being above the scale midpoint** tells us that more than half the landscape is costly terrain for a transiting wild boar. 
-
-This is consistent with what ecologists call a **landscape of fear** — animals are reluctant to cross open ground and concentrate their transit into a small fraction of the landscape.
+**Motorways and large lakes** appear as white NoData — absolute barriers.
 :::
 
 ---
@@ -287,8 +261,8 @@ This is consistent with what ecologists call a **landscape of fear** — animals
 
 ![](../images/suitability_resistance_maps_Zurich.png){width=100%}
 
-::: {style="font-size:0.75em; color:#555"}
-Aargau β and z-standardisation reused | Zürich-specific normalisation for within-canton contrast | permanent ASF fences burned in as absolute barriers
+::: {style="font-size:0.55em; color:#888; text-align:center; margin-top:0.1em"}
+Habitat suitability (left) and resistance surface (right) for Canton Zürich · Aargau β reused · Zürich-local normalisation · permanent ASF fences burned in as absolute barriers
 :::
 
 ::: {.notes}
@@ -307,7 +281,9 @@ At the end the **Wildlife passages** override everything.
 
 ## QGIS Plugin workflow
 
-![](../images/plugin_workflow.svg)
+::: {style="text-align:center"}
+![](../images/plugin_workflow.svg){fig-align="center" width="50%"}
+:::
 
 ::: {.notes}
 This is the **Processdiagram** of the QGIS Plugin workflow.
@@ -327,134 +303,267 @@ The **five modules are complementary**: LCP gives the backbone corridor, infecti
 
 ---
 
-## Demo — Baseline (Winterthur)
+## Least-cost path
 
 ::::: columns
-::: {.column width="40%"}
-![](../images/baseline.png){width=100%}
+::: {.column width="50%"}
+![](../images/lcp_winti.png)
+
+::: {style="font-size:0.55em; color:#888; text-align:center; margin-top:0.2em"}
+Baseline — outbreak origin north of Winterthur
 :::
+:::
+::: {.column width="50%"}
+![](../images/lcp_withfence.png)
 
-::: {.column width="60%"}
-::: {style="font-size:0.72em; line-height:1.5"}
-**Top left — Outbreak origin**
-Placement north of Winterthur on the resistance surface on Open Street Map Basemap.
-
-**Top right — Least-cost paths**
-Corridors to nearest habitat clusters. Darker blue = higher shared movement.
-
-**Middle left — Infection risk**
-Red = high risk (3 km), yellow = surveillance zone (10 km), green = low risk.
-
-**Middle right — Circuit theory**
-Bright cells are pinchpoints where current concentrates — priority fence locations.
-
-**Bottom left — Random walk**
-Density from 2,000 simulated animals. Brightness shows movement concentration.
-
-**Bottom right — iSSF agent model**
-Contamination probability from 2,000 infected agents over the ASF infectious period.
+::: {style="font-size:0.55em; color:#888; text-align:center; margin-top:0.2em"}
+After intervention — fence across main corridor, new overpass added
 :::
 :::
 :::::
 
 ::: {.notes}
-This is a baseline run with the outbreak origin placed north of Winterthur.
+**Presentation**
 
-The top-left panel shows the location on an **OpenStreetMap basemap**. The surrounding forested ridges are clearly visible, and the Winterthur urban area sits to the south.
+The least-cost path **traces the cheapest route through the resistance surface** from the outbreak origin to the nearest habitat clusters. 
 
-The top-right panel shows the **least-cost path corridors**. These are the cheapest routes through the resistance surface from the origin to the nearest habitat clusters. The darker the blue, the more corridors share that segment, so it marks the main backbone the model considers most used.
+On the left is the baseline. The darker the blue, the more destination clusters share that segment, which marks the main dispersal backbone. 
 
-The middle-left panel shows the **infection risk surface**. It is a continuous probability layer derived from cost-distance. The red area is the high-risk zone corresponding to the EFSA 3-kilometre protection radius, the yellow area is the 10-kilometre surveillance zone, and green marks low risk beyond that. The zones are not circles because the landscape resistance influences them.
+On the right, a fence segment was placed across the main corridor and a new overpass added to the south of the outbreak origin. 
 
-The middle-right panel shows the **circuit-theory pinchpoints**. Current is injected from the origin and the brightness shows where it concentrates. The brightest cells are the structural bottlenecks: placing a fence there would have the greatest effect on connectivity.
+The **backbone reroutes** immediately through the overpass and shifts northward. 
 
-The bottom-left panel is the **biased correlated random walk**. Two thousand simulated animals were released and their visit density was accumulated. The bright core confirms the most probable movement area around the origin.
+This is the most intuitive module and gives an **important overview** of the major wildlife corridors.
 
-The bottom-right panel is the **iSSF agent model**. Two thousand infected agents moved for a stochastically drawn infectious period and the fraction visiting each cell gives a contamination probability. This is the only module that combines movement with the epidemiology of ASF directly.
+The **main limitation** is that if there are multiple routes which are nearly equally cheap, the module only ever returns one of them and the existence of a viable alternative corridor stays invisible.
+
+The method also assumes that the animal has **perfect knowledge** over the entire landscape and only uses the theoretically best route.
+
+**For supervisors**
+
+The algorithm is Dijkstra on an 8-connected pixel grid, with diagonal moves penalised by a factor of the square root of 2 to avoid underestimating diagonal cost. 
+
+Habitat destinations are either supplied by the user as a polygon layer or auto-detected by thresholding the resistance raster. 
+
+Shared segments accumulate strength proportional to the number and distance to destination clusters they serve. 
+
+The method assumes the animal has complete knowledge of the cost surface across the entire canton, which is biologically unrealistic but is a standard and accepted simplification in connectivity modelling. 
 :::
 
 ---
 
-## Demo — Scenario comparison
+## Circuit theory
 
 ::::: columns
 ::: {.column width="50%"}
-![Baseline](../images/lcp_winti.png)
-:::
+![](../images/circuit_winti.png)
 
+::: {style="font-size:0.55em; color:#888; text-align:center; margin-top:0.2em"}
+Baseline — bright cells mark structural pinchpoints
+:::
+:::
 ::: {.column width="50%"}
-![After intervention](../images/lcp_withfence.png)
+![](../images/circuit_withfence.png)
+
+::: {style="font-size:0.55em; color:#888; text-align:center; margin-top:0.2em"}
+After intervention — current redistributes away from fenced segment
+:::
 :::
 :::::
 
 ::: {.notes}
-Starting from the baseline, I drew a fence segment across the main bottlenecks identified by Circuitscape at the wildlife overpasses on a motorway, and placed a new virtual overpass on a motorway directly in the north of winterthur. Left panel is baseline, right panel is after the intervention.
+**Presentation**
 
-The primary corridor is blocked and the model routes more to the north and crosses the new overpass to the south of the outbreak point.
+Circuit theory **injects current from the outbreak origin** and the brightness of each cell shows how much current passes through it. 
+
+The **brightest cells are the pinchpoints**. The locations where movement is most concentrated and where a fence would have the greatest effect. 
+
+On the right, **after placing the fence**, current can no longer flow through the main pinchpoint. It **redistributes into secondary corridors** and through the overpass. 
+
+The bright **branches shift**, confirming that the fence has structurally changed the animals movement.
+
+Compared to the least-cost-path analysis, the circuit theory method identifies not only the single theoretically optimal corridor but also **all parallel corridors**.
+
+
+
+**For supervisors**
+
+The preferred solver is the official Julia package Circuitscape.jl, called as an external subprocess. A scipy Laplacian solver written in Python serves as a fallback when Julia is not available. Both produce equivalent results. 
+
+The mathematical equivalence between circuit theory and the expected number of visits by a random walker means that pinchpoints correspond to where a randomly dispersing animal would concentrate its movement, giving the result a direct biological interpretation. 
+
+The key limitation is that the method aggregates resistance across parallel and series paths in the resistor network, and this can make a route through the edge of a settlement register as a dominant pinchpoint if it is electrically cheaper than the forested alternative, even though a wild boar would never use it in practice.
+
+A wild boar has bigger global knowledge than current.
 :::
 
 ---
 
-## Risk and contamination — fence scenario
+## Infection risk
 
 ::::: columns
 ::: {.column width="50%"}
-![](../presentation/images/circuit_fence.png)
-:::
+![](../images/infection_risk_winti.png)
 
+::: {style="font-size:0.55em; color:#888; text-align:center; margin-top:0.2em"}
+Baseline — red: 3 km protection zone · yellow: 10 km surveillance zone
+:::
+:::
 ::: {.column width="50%"}
-![](../presentation/images/bcrw_fence.png)
+![](../images/infection_risk_withfence.png)
+
+::: {style="font-size:0.55em; color:#888; text-align:center; margin-top:0.2em"}
+After intervention — risk zone contracts on fenced side, extends through overpass
+:::
 :::
 :::::
 
 ::: {.notes}
-Here are the other analysis.
+**Presentation**
 
-In the circuit theory panels, the fence is visible as a white line cutting through the brightest branch. Current can no longer flow through that segment, so it redistributes into secondary corridors. The overall pinchpoint pattern shifts north and southward toward the overpasses.
+The infection risk module **converts cost-distance from the outbreak origin into a probability surface** using an exponential decay function. 
 
-In the infection risk panels, the effect is asymmetric. The risk zones contract on the fenced side because the model can no longer route through that corridor. On the overpass side the zones extend, which is the expected trade-off: the fence does not eliminate connectivity, it redirects it.
+Red is the **high-risk zone** corresponding to the EFSA 3-kilometre protection radius. Yellow is the 10-kilometre **surveillance zone**. Green marks low risk beyond that. 
 
-The random walk panels show the same redistribution stochastically. The bright density core around the origin is now pulled toward the overpass rather than spreading evenly in all directions. The fence is working as a barrier in the simulation.
+The zones are **adjusted to the landscape resistance** which makes the actual spread radius of the virus more realistic. 
 
-The IBMM layer shows nearly no change when the fences and overpass are included. This is due to the implementation of the IBMM method were any agent jumps more than just to its neighbouring pixel and therefore can easily jump over the motorway, which is unrealistic and not very helpful.
+The virus will extend **further through forested corridors** and contract toward Settlements where resistance is high. 
 
-Therefore the key message is that no single method is best for building such a management tool but including different analysis brings best possible information to make a decision.
+On the right, after placing the fence, the red zone shrinks on the fenced side and the **high-risk zone retracts in that direction**. The risk does not disappear but is redirected through the new overpass corridor.
+
+This method gives authorities a **directly readable risk surface** aligned with regulatory thresholds.
+
+**For supervisors**
+
+The decay function is risk = exp(minus d divided by D_cost), where D_cost rescales the published 4-kilometre mean wild boar dispersal distance into cost units using the pixel size and the median resistance of the analysis window. 
+
+Because the median resistance shifts whenever the user changes the outbreak origin or adds a landscape modification, the same nominal risk value can correspond to a different real-world distance between scenario runs, making direct numerical comparison between runs less straightforward than it appears. 
+
+The strength of the module is that it gives veterinary authorities an output they can act on immediately, because it speaks the language of the EFSA operational zones that already govern their response protocols.
 :::
 
 ---
 
-## Discussion
+## Biased correlated random walk
 
-::::: {.columns style="font-size:0.82em"}
+::::: columns
 ::: {.column width="50%"}
-**What worked**
+![](../images/bcrw_winti.png)
 
-- Coefficients ecologically interpretable: forest cover, infrastructure avoidance
-- Resistance surface reproduces expected landscape structure
-- Five modules complement each other well
-- Interactivity closes the gap to operational management
+::: {style="font-size:0.55em; color:#888; text-align:center; margin-top:0.2em"}
+Baseline — brightness shows visit density of 2,000 simulated walkers
+:::
+:::
+::: {.column width="50%"}
+![](../images/bcrw_withfence.png)
+
+::: {style="font-size:0.55em; color:#888; text-align:center; margin-top:0.2em"}
+After intervention — density blocked by motorway fence
+:::
+:::
+:::::
+
+::: {.notes}
+**Presentation**
+
+The biased correlated random walk **releases 2,000 simulated animals** from the outbreak origin. 
+
+Each **walker selects its next step based on the resistance of its neighbouring cells** and a directional persistence term that keeps it moving in roughly the same direction. 
+
+The **brightness of each cell shows how many walkers visited it**. 
+
+On the left, the **density concentrates in a core around the origin** and fans out along the forested ridges. 
+
+On the right, after the fence intervention, the density is completly blocked by the motorway. 
+
+
+**For supervisors**
+
+The mathematical connection between the biased correlated random walk and circuit theory is established by Panzacchi et al. (2016), who showed that the BCRW density surface converges to the circuit-theory current density **as the number of walkers and the temperature parameter of the cost weighting approach their respective limits**. 
+
+The result converges toward the circuit-theory pinchpoint pattern, which is expected because the two methods are theoretically related.
+
+In the plugin, the cost weight follows a Boltzmann distribution over the resistance values of candidate endpoints, and the directional persistence follows a von Mises distribution with parameters taken from the iSSF fitting. 
+
+One known limitation is that the stochastic component can occasionally override the landscape pull, sending a walker into open or settled terrain that the cost surface would otherwise disfavour. 
+
+A related limitation is that the method can fail to register small localised features such as a single wildlife overpass, because a walker only reacts to resistance immediately around its current position and may simply never visit the overpass cell.
 :::
 
+---
+
+## iSSF agent model
+
+::::: columns
 ::: {.column width="50%"}
-**Key limitations**
+![](../images/ibmm_winti.png)
+
+::: {style="font-size:0.55em; color:#888; text-align:center; margin-top:0.2em"}
+Baseline — contamination probability from 2,000 infected agents over the ASF infectious period
+:::
+:::
+::: {.column width="50%"}
+![](../images/ibmm_withfence.png)
+
+::: {style="font-size:0.55em; color:#888; text-align:center; margin-top:0.2em"}
+After intervention — limited response to fence intervention
+:::
+:::
+:::::
+
+::: {.notes}
+**Presentation**
+
+The iSSF agent model **simulates 2,000 infected wild boar** from the outbreak origin. 
+
+Each agent **moves for a stochastically drawn infectious period** calibrated to virological data on ASF in European wild boar. 
+
+At each step it **samples candidate endpoints from the movement kernel** and **selects among them based on habitat suitability**. 
+
+The **fraction of agents visiting each cell** gives the contamination probability. 
+
+This is the only module that **combines movement behaviour with the actual duration of infectiousness**, so it shows disease reach rather than movement capacity alone. 
+
+The fence scenario shows limited change compared to the other modules, which is a strong limitation of the method and shows that there is no single best method to model wild boar connectivity and ASF spreading but a combination of different methods provide different views and best information for real management decisions.
+
+The fence scenario shows little response in the IBMM output compared to the other four modules. 
+
+This limitation illustrates that there is **no single best method** in this case. Each module captures a different aspect of the problem, and it is the combination of all five that gives the most complete basis for a management decision.
+
+**For supervisors**
+
+The limited response to the fence is a known implementation artefact. Agents select their next step by scoring candidate endpoints drawn from the movement kernel by habitat suitability. 
+
+The check is purely on the destination cell: the model does not test whether the straight line from the current position to that endpoint crosses an absolute barrier such as a motorway or a NaN-encoded fence. 
+
+An agent can therefore appear on the wrong side of a barrier in a single step. Fixing this would require a line-of-sight check for every candidate endpoint of every agent at every step, which is computationally expensive and was beyond the scope of this thesis. 
+
+The IBMM is therefore best used for assessing disease reach in open corridors rather than for evaluating the effect of hard barriers. 
+
+For fence placement decisions, circuit theory and the least-cost path are the appropriate modules. 
+
+The broader lesson is that no single method captures the full picture. The combination of all five gives a wildlife manager the most complete basis for a decision.
+:::
+
+---
+
+## Key limitations
 
 - No Zürich telemetry → no quantitative validation
 - 10-year gap between telemetry (2014–17) and landscape data (2026)
 - Keeley C = 4 from red deer, no wild-boar-specific value
-- IBMM can step across absolute barriers (endpoint selection artefact)
-:::
-:::::
+- Edge Effects on national border
 
 ::: {.notes}
-Now to the discussion.
+Now to the **Key limitations**.
 
-The iSSF results are ecologically coherent. All infrastructure classes produce avoidance during transit, forest density drives the most precisely estimated effect, and the resistance surface looks like what you would expect from field knowledge of the study area.
+The most significant limitation is the **absence of GPS telemetry** from Canton Zürich. Without independent movement data from the transfer area, **model quality cannot be validated beyond visual plausibility**, which leaves the practical reliability of the Zürich surface uncertain.
 
-The biggest methodological limitation is the Keeley constant. C equals 4 controls how steeply resistance rises as suitability falls. That value was calibrated by Fischer for red deer. Wild boar are more generalist and may experience the landscape as less costly — a lower C might be more appropriate, but no species-specific value exists in the literature.
+A **ten-year gap** separates the telemetry data collected between 2014 and 2017 from the landscape covariates derived from the 2026 swissTLM3D edition. Infrastructure changes and land cover transitions that occurred in that period are not reflected in the behavioural calibration, and their net effect on the resistance surface was not assessed.
 
-On the validation side: I have no Zürich telemetry to test the transferred surface against. Model quality is assessed through visual plausibility only. That is the most important thing to fix in future work.
+The **Keeley constant C = 4** was adopted from Fischer (2024), where it was **calibrated for red deer**. Because **wild boar are a more generalist species** that tolerates a wider range of habitat types, their perceived **movement cost may rise less steeply** with declining suitability than the current parameterisation assumes. No species-specific value exists in the literature, making this a pragmatic rather than empirically derived choice.
 
-The IBMM has a known artefact where agents can appear on the wrong side of an absolute barrier. This happens because endpoint selection checks habitat suitability at the destination but not whether the path crosses a NaN wall.
+Finally, the **national boundary introduces edge effects** along the northern study area margin. Wild boar do not respond to administrative borders, and the **absence of German geodata** means that corridors crossing into Baden-Württemberg are truncated at the national boundary rather than modelled continuously.
 :::
 
 ---
@@ -465,9 +574,8 @@ The IBMM has a known artefact where agents can appear on the wrong side of an ab
 ::: {.column width="55%"}
 **Deliverables**
 
-- First wild-boar-specific resistance surface for the Swiss Mittelland
-- QGIS plugin: 5 analyses · <3 min · no programming required
-- Addresses the Hess (1994) trade-off in an operational planning context
+- Wild-boar-specific resistance surface for the Swiss Plateau
+- Interactive QGIS plugin with 5 complementary analyses
 
 **The tool is ready for pilot use**
 :::
@@ -476,21 +584,21 @@ The IBMM has a known artefact where agents can appear on the wrong side of an ab
 **Priority next steps**
 
 1. GPS telemetry from Zürich wild boar — validation
-2. Population density weighting
+2. Additional or optimized spatial Covariates
 3. Day / night movement distinction
-4. Better forest data (lidar / canopy height)
-5. Cross-border data (German side of Rhine)
+4. Cross-border data
+5. Adjusted Keeley constant C = 4
 :::
 :::::
 
 ::: {.notes}
-To summarise: this thesis produced two concrete deliverables. 
+To summarise: the **tool is ready for pilot use**.
 
-The resistance surface is calibrated specifically for wild boar in the Swiss Plateau. 
+The **resistance surface is calibrated** specifically for wild boar in the Swiss Plateau. 
 
-The QGIS plugin is an interactive wildboar connectivity and ASF scenario planning tool that integrates five complementary connectivity models in a single accessible interface.
+The **QGIS plugin works** as an interactive wildboar connectivity and ASF scenario planning tool that integrates five complementary connectivity models in a single accessible interface.
 
-The most important next step is straightforward: get GPS tracking data from wild boar in Zürich and run a formal validation. 
+The **most important next step** is now to get GPS tracking data from wild boar in Zürich and run a formal validation. 
 
 Everything else on the list is valuable, but none of it matters as much as knowing whether the model actually captures how Zürich wild boar move.
 :::

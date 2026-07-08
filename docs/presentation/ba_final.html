@@ -10,8 +10,7 @@
   <meta name="generator" content="quarto-1.9.31">
 
   <meta name="author" content="Lukas Buchmann">
-  <meta name="dcterms.date" content="2026-07-01">
-  <title>An Interactive Planning Tool for Wild Boar Connectivity and African Swine Fever Prevention</title>
+  <title>Interactive Planning Tool for Wild Boar Connectivity</title>
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, minimal-ui">
@@ -131,8 +130,8 @@
   <div class="reveal">
     <div class="slides">
 
-<section id="title-slide" data-background-image="../cover.png" data-background-opacity="0.3" data-background-size="cover" class="quarto-title-block center">
-  <h1 class="title">An Interactive Planning Tool for Wild Boar Connectivity and African Swine Fever Prevention</h1>
+<section id="title-slide" data-background-color="#000" data-background-image="../cover.png" data-background-opacity="0.3" data-background-size="cover" class="quarto-title-block center">
+  <h1 class="title">Interactive Planning Tool for Wild Boar Connectivity</h1>
   <p class="subtitle">Bachelor Thesis · Applied Digital Life Science · ZHAW</p>
 
 <div class="quarto-title-authors">
@@ -143,7 +142,7 @@ Lukas Buchmann
 </div>
 </div>
 
-  <p class="date">2026-07-01</p>
+  <p class="date">09.07.2026</p>
 </section>
 <section id="the-problem" class="slide level2">
 <h2>The problem</h2>
@@ -167,7 +166,10 @@ Lukas Buchmann
 </div>
 </div>
 </div><div class="column" style="width:50%;">
-<p><img data-src="images/connectivity.png"></p>
+<p><img data-src="../images/efs27290-fig-0006-m.jpg" style="width:75.0%"></p>
+<div style="font-size:0.55em; color:#888; text-align:center; margin-top:0.2em">
+<p>Source: EFSA (2022) — Epidemiological analyses of African swine fever in the European Union</p>
+</div>
 </div></div>
 <aside class="notes">
 <p>Let me start with the <strong>core tension</strong> that motivated this thesis.</p>
@@ -194,7 +196,7 @@ Lukas Buchmann
 </section>
 <section id="what-is-missing" class="slide level2">
 <h2>What is missing</h2>
-<p>Existing Swiss connectivity models — Fischer (2024), Urbina (2023) — are <strong>static</strong>.</p>
+<p>Existing connectivity models are <strong>static</strong>.</p>
 <p>They answer: <em>where are the corridors?</em></p>
 <p>They cannot answer:</p>
 <ul>
@@ -246,10 +248,13 @@ Lukas Buchmann
 <li><strong>Calibration:</strong> Canton Aargau — GPS telemetry available</li>
 <li><strong>Transfer:</strong> Canton Zürich — independent application area</li>
 <li>25 m resolution · Swiss LV95</li>
-<li>Landscape: Swiss Mittelland — motorways, rail, agriculture interrupting forested ridges</li>
+<li>Landscape: Swiss Plateau — forested areas cut by motorways, rail, agriculture and settlements</li>
 </ul>
 </div><div class="column" style="width:45%;">
 <p><img data-src="../images/aargau_study_area.png"></p>
+<div style="font-size:0.55em; color:#888; text-align:center; margin-top:0.2em">
+<p>Study area extent — Canton Aargau with 1 km buffer, clipped at national border</p>
+</div>
 </div></div>
 <aside class="notes">
 <p>Geographically, the tool was calibrated for the <strong>Swiss Plateau</strong> area.</p>
@@ -271,8 +276,14 @@ Lukas Buchmann
 </section>
 <section id="resistance-surface-pipeline" class="slide level2">
 <h2>Resistance Surface Pipeline</h2>
-
-<img data-src="../images/pipeline.svg" class="r-stretch"><aside class="notes">
+<div style="text-align:center">
+<div class="quarto-figure quarto-figure-center">
+<figure>
+<p><img data-src="../images/pipeline.svg" class="quarto-figure quarto-figure-center" style="width:60.0%"></p>
+</figure>
+</div>
+</div>
+<aside class="notes">
 <p>Here you can see the <strong>Processdiagram</strong> of the Resistance Surface Pipeline.</p>
 <p>It starts with <strong>raw GPS data</strong> from 16 animals in Aargau between 2014 and 2017 at a 15-minute fix interval.</p>
 <p>After <strong>removing short deployments and dropping biologically implausible steps</strong> I classified each step as either in-matrix or in-patch using a three-rule hierarchical classifier.</p>
@@ -295,10 +306,10 @@ Lukas Buchmann
 <h2>Step classification</h2>
 <table class="caption-top">
 <colgroup>
-<col style="width: 19%">
-<col style="width: 35%">
-<col style="width: 22%">
-<col style="width: 22%">
+<col style="width: 7%">
+<col style="width: 76%">
+<col style="width: 8%">
+<col style="width: 8%">
 </colgroup>
 <thead>
 <tr class="header">
@@ -356,74 +367,27 @@ Lukas Buchmann
           display:block!important;
       }</style></aside>
 </section>
-<section id="issf-7-covariates-retained" class="slide level2">
-<h2>iSSF — 7 covariates retained</h2>
-<div class="columns">
-<div class="column" style="width:50%;">
-<div style="font-size:0.82em">
-<p>14 candidates → <strong>7 retained</strong> (all VIF &lt; 1.5)</p>
-<p><strong>Kept:</strong></p>
-<ul>
-<li>forest density 50 m</li>
-<li>forest density 1000 m</li>
-<li>distance to water</li>
-<li>distance to main roads</li>
-<li>distance to secondary roads</li>
-<li>distance to railways</li>
-<li>distance to settlements</li>
-</ul>
-</div>
-</div><div class="column" style="width:50%;">
-<div class="callout callout-important callout-titled callout-style-default">
-<div class="callout-body">
-<div class="callout-title">
-<div class="callout-icon-container">
-<i class="callout-icon"></i>
-</div>
-<p><strong>Important</strong></p>
-</div>
-<div class="callout-content">
-<p><strong>Fenced road exclusion</strong></p>
-<p>Initial β = −0.60 → apparent attraction to motorways.</p>
-<p>Cause: animals <em>pacing along</em> fenced motorways, not crossing them. This is a data artefact, not true preference. Fenced roads belong in the burn-in, not the regression.</p>
-</div>
-</div>
-</div>
-</div></div>
-<aside class="notes">
-<p>An iSSF (<strong>integrated step-selection function</strong>) is a <strong>statistical model</strong> that estimates which habitat features an animal selects for during movement by comparing observed GPS steps to random alternative steps drawn from the animal’s own movement distribution.</p>
-<p>I started with <strong>14 candidate covariates</strong> from the swissTLM3D dataset and the DHM25 elevation model. After a VIF (Variance Inflation Factor) check to flag collinearity, seven survived with all VIFs below 1.5.</p>
-<p>The most interesting exclusion is <strong>distance to fenced roads</strong>. In the initial exploratory model, the <strong>coefficient</strong> came back <strong>negative</strong> — apparently indicating that <strong>wild boar are attracted to motorways</strong>.</p>
-<p>That is ecologically implausible.</p>
-<p>What is actually happening is that an animal that cannot cross a fenced motorway <strong>walks along the fence</strong> for an extended distance, creating a <strong>systematic spatial association</strong> between the animal and the motorway in the data. <strong>The iSSF picks this up as apparent attraction</strong>. The correct treatment is to place fenced roads in the burn-in part as absolute barriers and leave them out of the regression.</p>
-<style type="text/css">
-        span.MJX_Assistive_MathML {
-          position:absolute!important;
-          clip: rect(1px, 1px, 1px, 1px);
-          padding: 1px 0 0 0!important;
-          border: 0!important;
-          height: 1px!important;
-          width: 1px!important;
-          overflow: hidden!important;
-          display:block!important;
-      }</style></aside>
-</section>
 <section id="issf-results" class="slide level2">
 <h2>iSSF results</h2>
 <div class="columns">
 <div class="column" style="width:55%;">
 <p><img data-src="../images/issf_coefficients.png"></p>
+<div style="font-size:0.55em; color:#888; text-align:center; margin-top:0.2em">
+<p>iSSF coefficients with 95% confidence intervals — 7 retained covariates</p>
+</div>
 </div><div class="column" style="width:45%;">
 <ul>
 <li>All 7 coefficients <strong>positive</strong></li>
 <li>Positive = preferred during transit</li>
 <li>Forest density 50 m: tightest CI — most reliably estimated</li>
 <li>Railway: strong avoidance, wide CI (sparse in Aargau)</li>
-<li>Movement kernel terms both highly significant</li>
+<li>Biologically realistic</li>
 </ul>
 </div></div>
 <aside class="notes">
-<p>All seven retained covariates were <strong>positive predictors</strong> of transit movement, confirming that <strong>wild boar prefer</strong> denser forest cover and greater distance from roads, railways, and settlements during directed travel. This pattern is <strong>biologically realistic and consistent</strong> with the established movement ecology of the species.</p>
+<p>An iSSF (<strong>integrated step-selection function</strong>) is a <strong>statistical model</strong> that estimates which habitat features an animal selects for during movement by comparing observed GPS steps to random alternative steps drawn from the animal’s own movement distribution.</p>
+<p>I started with <strong>14 candidate covariates</strong> from the swissTLM3D dataset and the DHM25 elevation model. After a VIF (Variance Inflation Factor) check to flag collinearity, seven survived with all VIFs below 1.5.</p>
+<p>All these covariates were <strong>positive predictors</strong> of transit movement, confirming that <strong>wild boar prefer</strong> denser forest cover and greater distance from roads, railways, and settlements during directed travel. This pattern is <strong>biologically realistic and consistent</strong> with the established movement ecology of the species.</p>
 <p>The forest density at the 50 metre scale has the <strong>highest beta coefficient</strong> and <strong>smallest standard error</strong>. Which means its the <strong>most reliably estimated effect</strong>: immediate cover is the dominant driver of where a wild boar chooses to transit through the landscape.</p>
 <p><strong>Railway avoidance</strong> has also a very strong point estimate but the <strong>widest confidence interval</strong>, because Aargau has relatively <strong>few railway lines</strong> and the training data for that covariate is sparse. The <strong>avoidance is real</strong>, but we should not over-interpret the precise magnitude.</p>
 <p>The <strong>two movement kernel</strong> terms were <strong>both significant</strong>, confirming that habitat selection and movement mechanics needed to be modelled jointly.</p>
@@ -442,14 +406,13 @@ Lukas Buchmann
 <section id="resistance-surface-aargau" class="slide level2">
 <h2>Resistance surface — Aargau</h2>
 
-<img data-src="../images/suitability_resistance_maps_Aargau.png" style="width:100.0%" class="r-stretch"><div style="font-size:0.75em; color:#555">
-<p>Range: 1–54.6 | NoData = absolute barriers</p>
+<img data-src="../images/suitability_resistance_maps_Aargau.png" style="width:100.0%" class="r-stretch"><div style="font-size:0.55em; color:#888; text-align:center; margin-top:0.1em">
+<p>Habitat suitability (left) and resistance surface (right) for Canton Aargau · R range: 1–54.6 · white = absolute barrier (NoData)</p>
 </div>
 <aside class="notes">
 <p>This is the <strong>final Habitat Suitability and Resistance Surface</strong> for the Canton Aargau.</p>
-<p>They <strong>reproduce the expected landscape structure</strong>. <strong>Forested ridges</strong> appear as low-resistance green corridors. The <strong>agricultural plain and urban areas push</strong> resistance up toward the maximum. <strong>Motorways and large lakes</strong> appear as grey NoData — absolute barriers.</p>
-<p>The <strong>median resistance being above the scale midpoint</strong> tells us that more than half the landscape is costly terrain for a transiting wild boar.</p>
-<p>This is consistent with what ecologists call a <strong>landscape of fear</strong> — animals are reluctant to cross open ground and concentrate their transit into a small fraction of the landscape.</p>
+<p>They <strong>reproduce the expected landscape structure</strong>. <strong>Forested ridges</strong> appear as low-resistance green corridors. The <strong>agricultural plain and urban areas push</strong> resistance up toward the maximum.</p>
+<p><strong>Motorways and large lakes</strong> appear as white NoData — absolute barriers.</p>
 <style type="text/css">
         span.MJX_Assistive_MathML {
           position:absolute!important;
@@ -465,8 +428,8 @@ Lukas Buchmann
 <section id="transfer-to-zürich" class="slide level2">
 <h2>Transfer to Zürich</h2>
 
-<img data-src="../images/suitability_resistance_maps_Zurich.png" style="width:100.0%" class="r-stretch"><div style="font-size:0.75em; color:#555">
-<p>Aargau β and z-standardisation reused | Zürich-specific normalisation for within-canton contrast | permanent ASF fences burned in as absolute barriers</p>
+<img data-src="../images/suitability_resistance_maps_Zurich.png" style="width:100.0%" class="r-stretch"><div style="font-size:0.55em; color:#888; text-align:center; margin-top:0.1em">
+<p>Habitat suitability (left) and resistance surface (right) for Canton Zürich · Aargau β reused · Zürich-local normalisation · permanent ASF fences burned in as absolute barriers</p>
 </div>
 <aside class="notes">
 <p>For the transfer to Zürich, I <strong>reused the Aargau beta coefficients and z-standardisation</strong> parameters unchanged.</p>
@@ -488,8 +451,14 @@ Lukas Buchmann
 </section>
 <section id="qgis-plugin-workflow" class="slide level2">
 <h2>QGIS Plugin workflow</h2>
-
-<img data-src="../images/plugin_workflow.svg" class="r-stretch"><aside class="notes">
+<div style="text-align:center">
+<div class="quarto-figure quarto-figure-center">
+<figure>
+<p><img data-src="../images/plugin_workflow.svg" class="quarto-figure quarto-figure-center" style="width:50.0%"></p>
+</figure>
+</div>
+</div>
+<aside class="notes">
 <p>This is the <strong>Processdiagram</strong> of the QGIS Plugin workflow.</p>
 <p>First the <strong>resistance surface has to be loaded</strong> in a QGIS session.</p>
 <p>Then the <strong>user picks an outbreak point</strong> on the map with a single click. They can <strong>optionally draw fence segments or place new wildlife overpasses</strong>.</p>
@@ -509,62 +478,34 @@ Lukas Buchmann
           display:block!important;
       }</style></aside>
 </section>
-<section id="demo-baseline-winterthur" class="slide level2">
-<h2>Demo — Baseline (Winterthur)</h2>
-<div class="columns">
-<div class="column" style="width:40%;">
-<p><img data-src="../images/baseline.png" style="width:100.0%"></p>
-</div><div class="column" style="width:60%;">
-<div style="font-size:0.72em; line-height:1.5">
-<p><strong>Top left — Outbreak origin</strong> Placement north of Winterthur on the resistance surface on Open Street Map Basemap.</p>
-<p><strong>Top right — Least-cost paths</strong> Corridors to nearest habitat clusters. Darker blue = higher shared movement.</p>
-<p><strong>Middle left — Infection risk</strong> Red = high risk (3 km), yellow = surveillance zone (10 km), green = low risk.</p>
-<p><strong>Middle right — Circuit theory</strong> Bright cells are pinchpoints where current concentrates — priority fence locations.</p>
-<p><strong>Bottom left — Random walk</strong> Density from 2,000 simulated animals. Brightness shows movement concentration.</p>
-<p><strong>Bottom right — iSSF agent model</strong> Contamination probability from 2,000 infected agents over the ASF infectious period.</p>
-</div>
-</div></div>
-<aside class="notes">
-<p>This is a baseline run with the outbreak origin placed north of Winterthur.</p>
-<p>The top-left panel shows the location on an <strong>OpenStreetMap basemap</strong>. The surrounding forested ridges are clearly visible, and the Winterthur urban area sits to the south.</p>
-<p>The top-right panel shows the <strong>least-cost path corridors</strong>. These are the cheapest routes through the resistance surface from the origin to the nearest habitat clusters. The darker the blue, the more corridors share that segment, so it marks the main backbone the model considers most used.</p>
-<p>The middle-left panel shows the <strong>infection risk surface</strong>. It is a continuous probability layer derived from cost-distance. The red area is the high-risk zone corresponding to the EFSA 3-kilometre protection radius, the yellow area is the 10-kilometre surveillance zone, and green marks low risk beyond that. The zones are not circles because the landscape resistance influences them.</p>
-<p>The middle-right panel shows the <strong>circuit-theory pinchpoints</strong>. Current is injected from the origin and the brightness shows where it concentrates. The brightest cells are the structural bottlenecks: placing a fence there would have the greatest effect on connectivity.</p>
-<p>The bottom-left panel is the <strong>biased correlated random walk</strong>. Two thousand simulated animals were released and their visit density was accumulated. The bright core confirms the most probable movement area around the origin.</p>
-<p>The bottom-right panel is the <strong>iSSF agent model</strong>. Two thousand infected agents moved for a stochastically drawn infectious period and the fraction visiting each cell gives a contamination probability. This is the only module that combines movement with the epidemiology of ASF directly.</p>
-<style type="text/css">
-        span.MJX_Assistive_MathML {
-          position:absolute!important;
-          clip: rect(1px, 1px, 1px, 1px);
-          padding: 1px 0 0 0!important;
-          border: 0!important;
-          height: 1px!important;
-          width: 1px!important;
-          overflow: hidden!important;
-          display:block!important;
-      }</style></aside>
-</section>
-<section id="demo-scenario-comparison" class="slide level2">
-<h2>Demo — Scenario comparison</h2>
+<section id="least-cost-path" class="slide level2">
+<h2>Least-cost path</h2>
 <div class="columns">
 <div class="column" style="width:50%;">
-<div class="quarto-figure quarto-figure-center">
-<figure>
 <p><img data-src="../images/lcp_winti.png"></p>
-<figcaption>Baseline</figcaption>
-</figure>
+<div style="font-size:0.55em; color:#888; text-align:center; margin-top:0.2em">
+<p>Baseline — outbreak origin north of Winterthur</p>
 </div>
 </div><div class="column" style="width:50%;">
-<div class="quarto-figure quarto-figure-center">
-<figure>
 <p><img data-src="../images/lcp_withfence.png"></p>
-<figcaption>After intervention</figcaption>
-</figure>
+<div style="font-size:0.55em; color:#888; text-align:center; margin-top:0.2em">
+<p>After intervention — fence across main corridor, new overpass added</p>
 </div>
 </div></div>
 <aside class="notes">
-<p>Starting from the baseline, I drew a fence segment across the main bottlenecks identified by Circuitscape at the wildlife overpasses on a motorway, and placed a new virtual overpass on a motorway directly in the north of winterthur. Left panel is baseline, right panel is after the intervention.</p>
-<p>The primary corridor is blocked and the model routes more to the north and crosses the new overpass to the south of the outbreak point.</p>
+<p><strong>Presentation</strong></p>
+<p>The least-cost path <strong>traces the cheapest route through the resistance surface</strong> from the outbreak origin to the nearest habitat clusters.</p>
+<p>On the left is the baseline. The darker the blue, the more destination clusters share that segment, which marks the main dispersal backbone.</p>
+<p>On the right, a fence segment was placed across the main corridor and a new overpass added to the south of the outbreak origin.</p>
+<p>The <strong>backbone reroutes</strong> immediately through the overpass and shifts northward.</p>
+<p>This is the most intuitive module and gives an <strong>important overview</strong> of the major wildlife corridors.</p>
+<p>The <strong>main limitation</strong> is that if there are multiple routes which are nearly equally cheap, the module only ever returns one of them and the existence of a viable alternative corridor stays invisible.</p>
+<p>The method also assumes that the animal has <strong>perfect knowledge</strong> over the entire landscape and only uses the theoretically best route.</p>
+<p><strong>For supervisors</strong></p>
+<p>The algorithm is Dijkstra on an 8-connected pixel grid, with diagonal moves penalised by a factor of the square root of 2 to avoid underestimating diagonal cost.</p>
+<p>Habitat destinations are either supplied by the user as a polygon layer or auto-detected by thresholding the resistance raster.</p>
+<p>Shared segments accumulate strength proportional to the number and distance to destination clusters they serve.</p>
+<p>The method assumes the animal has complete knowledge of the cost surface across the entire canton, which is biologically unrealistic but is a standard and accepted simplification in connectivity modelling.</p>
 <style type="text/css">
         span.MJX_Assistive_MathML {
           position:absolute!important;
@@ -577,21 +518,32 @@ Lukas Buchmann
           display:block!important;
       }</style></aside>
 </section>
-<section id="risk-and-contamination-fence-scenario" class="slide level2">
-<h2>Risk and contamination — fence scenario</h2>
+<section id="circuit-theory" class="slide level2">
+<h2>Circuit theory</h2>
 <div class="columns">
 <div class="column" style="width:50%;">
-<p><img data-src="../presentation/images/circuit_fence.png"></p>
+<p><img data-src="../images/circuit_winti.png"></p>
+<div style="font-size:0.55em; color:#888; text-align:center; margin-top:0.2em">
+<p>Baseline — bright cells mark structural pinchpoints</p>
+</div>
 </div><div class="column" style="width:50%;">
-<p><img data-src="../presentation/images/bcrw_fence.png"></p>
+<p><img data-src="../images/circuit_withfence.png"></p>
+<div style="font-size:0.55em; color:#888; text-align:center; margin-top:0.2em">
+<p>After intervention — current redistributes away from fenced segment</p>
+</div>
 </div></div>
 <aside class="notes">
-<p>Here are the other analysis.</p>
-<p>In the circuit theory panels, the fence is visible as a white line cutting through the brightest branch. Current can no longer flow through that segment, so it redistributes into secondary corridors. The overall pinchpoint pattern shifts north and southward toward the overpasses.</p>
-<p>In the infection risk panels, the effect is asymmetric. The risk zones contract on the fenced side because the model can no longer route through that corridor. On the overpass side the zones extend, which is the expected trade-off: the fence does not eliminate connectivity, it redirects it.</p>
-<p>The random walk panels show the same redistribution stochastically. The bright density core around the origin is now pulled toward the overpass rather than spreading evenly in all directions. The fence is working as a barrier in the simulation.</p>
-<p>The IBMM layer shows nearly no change when the fences and overpass are included. This is due to the implementation of the IBMM method were any agent jumps more than just to its neighbouring pixel and therefore can easily jump over the motorway, which is unrealistic and not very helpful.</p>
-<p>Therefore the key message is that no single method is best for building such a management tool but including different analysis brings best possible information to make a decision.</p>
+<p><strong>Presentation</strong></p>
+<p>Circuit theory <strong>injects current from the outbreak origin</strong> and the brightness of each cell shows how much current passes through it.</p>
+<p>The <strong>brightest cells are the pinchpoints</strong>. The locations where movement is most concentrated and where a fence would have the greatest effect.</p>
+<p>On the right, <strong>after placing the fence</strong>, current can no longer flow through the main pinchpoint. It <strong>redistributes into secondary corridors</strong> and through the overpass.</p>
+<p>The bright <strong>branches shift</strong>, confirming that the fence has structurally changed the animals movement.</p>
+<p>Compared to the least-cost-path analysis, the circuit theory method identifies not only the single theoretically optimal corridor but also <strong>all parallel corridors</strong>.</p>
+<p><strong>For supervisors</strong></p>
+<p>The preferred solver is the official Julia package Circuitscape.jl, called as an external subprocess. A scipy Laplacian solver written in Python serves as a fallback when Julia is not available. Both produce equivalent results.</p>
+<p>The mathematical equivalence between circuit theory and the expected number of visits by a random walker means that pinchpoints correspond to where a randomly dispersing animal would concentrate its movement, giving the result a direct biological interpretation.</p>
+<p>The key limitation is that the method aggregates resistance across parallel and series paths in the resistor network, and this can make a route through the edge of a settlement register as a dominant pinchpoint if it is electrically cheaper than the forested alternative, even though a wild boar would never use it in practice.</p>
+<p>A wild boar has bigger global knowledge than current.</p>
 <style type="text/css">
         span.MJX_Assistive_MathML {
           position:absolute!important;
@@ -604,32 +556,140 @@ Lukas Buchmann
           display:block!important;
       }</style></aside>
 </section>
-<section id="discussion" class="slide level2">
-<h2>Discussion</h2>
-<div class="columns" style="font-size:0.82em">
+<section id="infection-risk" class="slide level2">
+<h2>Infection risk</h2>
+<div class="columns">
 <div class="column" style="width:50%;">
-<p><strong>What worked</strong></p>
-<ul>
-<li>Coefficients ecologically interpretable: forest cover, infrastructure avoidance</li>
-<li>Resistance surface reproduces expected landscape structure</li>
-<li>Five modules complement each other well</li>
-<li>Interactivity closes the gap to operational management</li>
-</ul>
+<p><img data-src="../images/infection_risk_winti.png"></p>
+<div style="font-size:0.55em; color:#888; text-align:center; margin-top:0.2em">
+<p>Baseline — red: 3 km protection zone · yellow: 10 km surveillance zone</p>
+</div>
 </div><div class="column" style="width:50%;">
-<p><strong>Key limitations</strong></p>
+<p><img data-src="../images/infection_risk_withfence.png"></p>
+<div style="font-size:0.55em; color:#888; text-align:center; margin-top:0.2em">
+<p>After intervention — risk zone contracts on fenced side, extends through overpass</p>
+</div>
+</div></div>
+<aside class="notes">
+<p><strong>Presentation</strong></p>
+<p>The infection risk module <strong>converts cost-distance from the outbreak origin into a probability surface</strong> using an exponential decay function.</p>
+<p>Red is the <strong>high-risk zone</strong> corresponding to the EFSA 3-kilometre protection radius. Yellow is the 10-kilometre <strong>surveillance zone</strong>. Green marks low risk beyond that.</p>
+<p>The zones are <strong>adjusted to the landscape resistance</strong> which makes the actual spread radius of the virus more realistic.</p>
+<p>The virus will extend <strong>further through forested corridors</strong> and contract toward Settlements where resistance is high.</p>
+<p>On the right, after placing the fence, the red zone shrinks on the fenced side and the <strong>high-risk zone retracts in that direction</strong>. The risk does not disappear but is redirected through the new overpass corridor.</p>
+<p>This method gives authorities a <strong>directly readable risk surface</strong> aligned with regulatory thresholds.</p>
+<p><strong>For supervisors</strong></p>
+<p>The decay function is risk = exp(minus d divided by D_cost), where D_cost rescales the published 4-kilometre mean wild boar dispersal distance into cost units using the pixel size and the median resistance of the analysis window.</p>
+<p>Because the median resistance shifts whenever the user changes the outbreak origin or adds a landscape modification, the same nominal risk value can correspond to a different real-world distance between scenario runs, making direct numerical comparison between runs less straightforward than it appears.</p>
+<p>The strength of the module is that it gives veterinary authorities an output they can act on immediately, because it speaks the language of the EFSA operational zones that already govern their response protocols.</p>
+<style type="text/css">
+        span.MJX_Assistive_MathML {
+          position:absolute!important;
+          clip: rect(1px, 1px, 1px, 1px);
+          padding: 1px 0 0 0!important;
+          border: 0!important;
+          height: 1px!important;
+          width: 1px!important;
+          overflow: hidden!important;
+          display:block!important;
+      }</style></aside>
+</section>
+<section id="biased-correlated-random-walk" class="slide level2">
+<h2>Biased correlated random walk</h2>
+<div class="columns">
+<div class="column" style="width:50%;">
+<p><img data-src="../images/bcrw_winti.png"></p>
+<div style="font-size:0.55em; color:#888; text-align:center; margin-top:0.2em">
+<p>Baseline — brightness shows visit density of 2,000 simulated walkers</p>
+</div>
+</div><div class="column" style="width:50%;">
+<p><img data-src="../images/bcrw_withfence.png"></p>
+<div style="font-size:0.55em; color:#888; text-align:center; margin-top:0.2em">
+<p>After intervention — density blocked by motorway fence</p>
+</div>
+</div></div>
+<aside class="notes">
+<p><strong>Presentation</strong></p>
+<p>The biased correlated random walk <strong>releases 2,000 simulated animals</strong> from the outbreak origin.</p>
+<p>Each <strong>walker selects its next step based on the resistance of its neighbouring cells</strong> and a directional persistence term that keeps it moving in roughly the same direction.</p>
+<p>The <strong>brightness of each cell shows how many walkers visited it</strong>.</p>
+<p>On the left, the <strong>density concentrates in a core around the origin</strong> and fans out along the forested ridges.</p>
+<p>On the right, after the fence intervention, the density is completly blocked by the motorway.</p>
+<p><strong>For supervisors</strong></p>
+<p>The mathematical connection between the biased correlated random walk and circuit theory is established by Panzacchi et al.&nbsp;(2016), who showed that the BCRW density surface converges to the circuit-theory current density <strong>as the number of walkers and the temperature parameter of the cost weighting approach their respective limits</strong>.</p>
+<p>The result converges toward the circuit-theory pinchpoint pattern, which is expected because the two methods are theoretically related.</p>
+<p>In the plugin, the cost weight follows a Boltzmann distribution over the resistance values of candidate endpoints, and the directional persistence follows a von Mises distribution with parameters taken from the iSSF fitting.</p>
+<p>One known limitation is that the stochastic component can occasionally override the landscape pull, sending a walker into open or settled terrain that the cost surface would otherwise disfavour.</p>
+<p>A related limitation is that the method can fail to register small localised features such as a single wildlife overpass, because a walker only reacts to resistance immediately around its current position and may simply never visit the overpass cell.</p>
+<style type="text/css">
+        span.MJX_Assistive_MathML {
+          position:absolute!important;
+          clip: rect(1px, 1px, 1px, 1px);
+          padding: 1px 0 0 0!important;
+          border: 0!important;
+          height: 1px!important;
+          width: 1px!important;
+          overflow: hidden!important;
+          display:block!important;
+      }</style></aside>
+</section>
+<section id="issf-agent-model" class="slide level2">
+<h2>iSSF agent model</h2>
+<div class="columns">
+<div class="column" style="width:50%;">
+<p><img data-src="../images/ibmm_winti.png"></p>
+<div style="font-size:0.55em; color:#888; text-align:center; margin-top:0.2em">
+<p>Baseline — contamination probability from 2,000 infected agents over the ASF infectious period</p>
+</div>
+</div><div class="column" style="width:50%;">
+<p><img data-src="../images/ibmm_withfence.png"></p>
+<div style="font-size:0.55em; color:#888; text-align:center; margin-top:0.2em">
+<p>After intervention — limited response to fence intervention</p>
+</div>
+</div></div>
+<aside class="notes">
+<p><strong>Presentation</strong></p>
+<p>The iSSF agent model <strong>simulates 2,000 infected wild boar</strong> from the outbreak origin.</p>
+<p>Each agent <strong>moves for a stochastically drawn infectious period</strong> calibrated to virological data on ASF in European wild boar.</p>
+<p>At each step it <strong>samples candidate endpoints from the movement kernel</strong> and <strong>selects among them based on habitat suitability</strong>.</p>
+<p>The <strong>fraction of agents visiting each cell</strong> gives the contamination probability.</p>
+<p>This is the only module that <strong>combines movement behaviour with the actual duration of infectiousness</strong>, so it shows disease reach rather than movement capacity alone.</p>
+<p>The fence scenario shows limited change compared to the other modules, which is a strong limitation of the method and shows that there is no single best method to model wild boar connectivity and ASF spreading but a combination of different methods provide different views and best information for real management decisions.</p>
+<p>The fence scenario shows little response in the IBMM output compared to the other four modules.</p>
+<p>This limitation illustrates that there is <strong>no single best method</strong> in this case. Each module captures a different aspect of the problem, and it is the combination of all five that gives the most complete basis for a management decision.</p>
+<p><strong>For supervisors</strong></p>
+<p>The limited response to the fence is a known implementation artefact. Agents select their next step by scoring candidate endpoints drawn from the movement kernel by habitat suitability.</p>
+<p>The check is purely on the destination cell: the model does not test whether the straight line from the current position to that endpoint crosses an absolute barrier such as a motorway or a NaN-encoded fence.</p>
+<p>An agent can therefore appear on the wrong side of a barrier in a single step. Fixing this would require a line-of-sight check for every candidate endpoint of every agent at every step, which is computationally expensive and was beyond the scope of this thesis.</p>
+<p>The IBMM is therefore best used for assessing disease reach in open corridors rather than for evaluating the effect of hard barriers.</p>
+<p>For fence placement decisions, circuit theory and the least-cost path are the appropriate modules.</p>
+<p>The broader lesson is that no single method captures the full picture. The combination of all five gives a wildlife manager the most complete basis for a decision.</p>
+<style type="text/css">
+        span.MJX_Assistive_MathML {
+          position:absolute!important;
+          clip: rect(1px, 1px, 1px, 1px);
+          padding: 1px 0 0 0!important;
+          border: 0!important;
+          height: 1px!important;
+          width: 1px!important;
+          overflow: hidden!important;
+          display:block!important;
+      }</style></aside>
+</section>
+<section id="key-limitations" class="slide level2">
+<h2>Key limitations</h2>
 <ul>
 <li>No Zürich telemetry → no quantitative validation</li>
 <li>10-year gap between telemetry (2014–17) and landscape data (2026)</li>
 <li>Keeley C = 4 from red deer, no wild-boar-specific value</li>
-<li>IBMM can step across absolute barriers (endpoint selection artefact)</li>
+<li>Edge Effects on national border</li>
 </ul>
-</div></div>
 <aside class="notes">
-<p>Now to the discussion.</p>
-<p>The iSSF results are ecologically coherent. All infrastructure classes produce avoidance during transit, forest density drives the most precisely estimated effect, and the resistance surface looks like what you would expect from field knowledge of the study area.</p>
-<p>The biggest methodological limitation is the Keeley constant. C equals 4 controls how steeply resistance rises as suitability falls. That value was calibrated by Fischer for red deer. Wild boar are more generalist and may experience the landscape as less costly — a lower C might be more appropriate, but no species-specific value exists in the literature.</p>
-<p>On the validation side: I have no Zürich telemetry to test the transferred surface against. Model quality is assessed through visual plausibility only. That is the most important thing to fix in future work.</p>
-<p>The IBMM has a known artefact where agents can appear on the wrong side of an absolute barrier. This happens because endpoint selection checks habitat suitability at the destination but not whether the path crosses a NaN wall.</p>
+<p>Now to the <strong>Key limitations</strong>.</p>
+<p>The most significant limitation is the <strong>absence of GPS telemetry</strong> from Canton Zürich. Without independent movement data from the transfer area, <strong>model quality cannot be validated beyond visual plausibility</strong>, which leaves the practical reliability of the Zürich surface uncertain.</p>
+<p>A <strong>ten-year gap</strong> separates the telemetry data collected between 2014 and 2017 from the landscape covariates derived from the 2026 swissTLM3D edition. Infrastructure changes and land cover transitions that occurred in that period are not reflected in the behavioural calibration, and their net effect on the resistance surface was not assessed.</p>
+<p>The <strong>Keeley constant C = 4</strong> was adopted from Fischer (2024), where it was <strong>calibrated for red deer</strong>. Because <strong>wild boar are a more generalist species</strong> that tolerates a wider range of habitat types, their perceived <strong>movement cost may rise less steeply</strong> with declining suitability than the current parameterisation assumes. No species-specific value exists in the literature, making this a pragmatic rather than empirically derived choice.</p>
+<p>Finally, the <strong>national boundary introduces edge effects</strong> along the northern study area margin. Wild boar do not respond to administrative borders, and the <strong>absence of German geodata</strong> means that corridors crossing into Baden-Württemberg are truncated at the national boundary rather than modelled continuously.</p>
 <style type="text/css">
         span.MJX_Assistive_MathML {
           position:absolute!important;
@@ -648,26 +708,25 @@ Lukas Buchmann
 <div class="column" style="width:55%;">
 <p><strong>Deliverables</strong></p>
 <ul>
-<li>First wild-boar-specific resistance surface for the Swiss Mittelland</li>
-<li>QGIS plugin: 5 analyses · &lt;3 min · no programming required</li>
-<li>Addresses the Hess (1994) trade-off in an operational planning context</li>
+<li>Wild-boar-specific resistance surface for the Swiss Plateau</li>
+<li>Interactive QGIS plugin with 5 complementary analyses</li>
 </ul>
 <p><strong>The tool is ready for pilot use</strong></p>
 </div><div class="column" style="width:45%;">
 <p><strong>Priority next steps</strong></p>
 <ol type="1">
 <li>GPS telemetry from Zürich wild boar — validation</li>
-<li>Population density weighting</li>
+<li>Additional or optimized spatial Covariates</li>
 <li>Day / night movement distinction</li>
-<li>Better forest data (lidar / canopy height)</li>
-<li>Cross-border data (German side of Rhine)</li>
+<li>Cross-border data</li>
+<li>Adjusted Keeley constant C = 4</li>
 </ol>
 </div></div>
 <aside class="notes">
-<p>To summarise: this thesis produced two concrete deliverables.</p>
-<p>The resistance surface is calibrated specifically for wild boar in the Swiss Plateau.</p>
-<p>The QGIS plugin is an interactive wildboar connectivity and ASF scenario planning tool that integrates five complementary connectivity models in a single accessible interface.</p>
-<p>The most important next step is straightforward: get GPS tracking data from wild boar in Zürich and run a formal validation.</p>
+<p>To summarise: the <strong>tool is ready for pilot use</strong>.</p>
+<p>The <strong>resistance surface is calibrated</strong> specifically for wild boar in the Swiss Plateau.</p>
+<p>The <strong>QGIS plugin works</strong> as an interactive wildboar connectivity and ASF scenario planning tool that integrates five complementary connectivity models in a single accessible interface.</p>
+<p>The <strong>most important next step</strong> is now to get GPS tracking data from wild boar in Zürich and run a formal validation.</p>
 <p>Everything else on the list is valuable, but none of it matters as much as knowing whether the model actually captures how Zürich wild boar move.</p>
 <style type="text/css">
         span.MJX_Assistive_MathML {
